@@ -231,3 +231,38 @@ h1 { font-size: 22px; }
 }
 
 .error { color: var(--rojo); font-size: 13px; }
+
+.chart-barras {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 160px;
+  margin-top: 20px;
+  padding: 0 4px;
+}
+.chart-barras .barra-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+}
+.chart-barras .barra-valor { font-size: 11px; font-weight: 700; margin-bottom: 4px; white-space: nowrap; }
+.chart-barras .barra { width: 100%; background: var(--azul); border-radius: 4px 4px 0 0; min-height: 2px; }
+.chart-barras .barra-label { font-size: 11px; color: var(--gris); margin-top: 6px; text-align: center; }
+
+.resumen-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 700;
+  margin-right: 8px;
+}
+.resumen-pill.ganando { background: #e7f7ed; color: var(--verde); }
+.resumen-pill.compartiendo { background: #fff4e0; color: #b8650a; }
+.resumen-pill.perdiendo { background: #fdeceb; color: var(--rojo); }
+.resumen-pill.sin-dato { background: #eee; color: var(--gris); }

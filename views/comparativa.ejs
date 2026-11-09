@@ -1,0 +1,69 @@
+<%
+const PRECIO_A_GANAR = {
+  winning: { label: 'Ganando', clase: 'badge-activo' },
+  sharing_first_place: { label: 'Compartiendo 1er lugar', clase: 'badge-stock-bajo' },
+};
+function precioEstadoInfo(status) {
+  return PRECIO_A_GANAR[status] || { label: status, clase: 'badge-pausado' };
+}
+%>
+<%- include('partials/head', { title: 'Comparativa - SymL', active: 'comparativa' }) %>
+
+  <h1>Comparativa con la competencia</h1>
+  <p class="muted">
+    Esta pantalla junta dos cosas: quién se está quedando con la "mejor oferta" (Buy Box)
+    de tus publicaciones de catálogo, y el precio promedio/mínimo de publicaciones
+    similares a la tuya que están a la venta en MercadoLibre en este momento (usando el
+    buscador público, no datos privados de nadie). <strong>Ambas son experimentales</strong> —
+    la primera porque no se pudo confirmar en vivo el endpoint de "precio para ganar", y la
+    segunda porque compara contra toda la categoría (no solo contra productos idénticos al
+    tuyo), así que es una referencia aproximada, no un dato exacto.
+  </p>
+
+  <div style="margin: 16px 0;">
+    <span class="resumen-pill ganando">✔ Ganando: <%= resumen.ganando %></span>
+    <span class="resumen-pill compartiendo">≈ Compartiendo 1er lugar: <%= resumen.compartiendo %></span>
+    <span class="resumen-pill perdiendo">✕ Perdiendo: <%= resumen.perdiendo %></span>
+    <span class="resumen-pill sin-dato">— Sin dato: <%= resumen.sinDato %></span>
+  </div>
+
+  <% if (comparativas.length === 0) { %>
+    <p class="muted">No hay publicaciones activas para comparar.</p>
+  <% } else { %>
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Tu precio</th>
+          <th>Buy Box</th>
+          <th>Precio para ganar</th>
+          <th>Precio promedio categoría</th>
+          <th>Precio mínimo categoría</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% comparativas.forEach(function(it) { %>
+          <tr>
+            <td class="prod-cell">
+              <img src="<%= it.thumbnail %>" alt="" class="thumb" />
+              <%= it.titulo %>
+            </td>
+            <td>$<%= it.precio %></td>
+            <td>
+              <% if (it.precioAGanar) { %>
+                <% const info = precioEstadoInfo(it.precioAGanar.status); %>
+                <span class="badge <%= info.clase %>"><%= info.label %></span>
+              <% } else { %>
+                <span class="muted">—</span>
+              <% } %>
+            </td>
+            <td><%= (it.precioAGanar && it.precioAGanar.precioParaGanar != null) ? ('$' + it.precioAGanar.precioParaGanar) : '—' %></td>
+            <td><%= it.mercado ? ('$' + Math.round(it.mercado.promedio).toLocaleString('es-AR') + ' (' + it.mercado.cantidad + ' public.)') : '—' %></td>
+            <td><%= it.mercado ? ('$' + Math.round(it.mercado.minimo).toLocaleString('es-AR')) : '—' %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <% } %>
+
+<%- include('partials/foot') %>

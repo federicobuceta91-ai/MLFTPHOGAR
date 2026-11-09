@@ -1,0 +1,62 @@
+<%
+// Traducción de estados de envío de MercadoLibre. Si aparece un estado que no
+// conocemos, lo mostramos tal cual lo manda ML (no lo ocultamos).
+const ESTADOS_ENVIO = {
+  pending: { label: 'Pendiente', clase: 'badge-stock-bajo' },
+  handling: { label: 'En preparación', clase: 'badge-stock-bajo' },
+  ready_to_ship: { label: 'Listo para enviar', clase: 'badge-stock-bajo' },
+  shipped: { label: 'En camino', clase: 'badge-drop' },
+  delivered: { label: 'Entregado', clase: 'badge-activo' },
+  not_delivered: { label: 'No entregado', clase: 'badge-pausado' },
+  cancelled: { label: 'Cancelado', clase: 'badge-pausado' },
+};
+function estadoEnvioInfo(estado) {
+  if (!estado) return { label: '—', clase: 'badge-pausado' };
+  return ESTADOS_ENVIO[estado] || { label: estado, clase: 'badge-pausado' };
+}
+%>
+<%- include('partials/head', { title: 'Envíos - SymL', active: 'envios' }) %>
+
+  <h1>Envíos</h1>
+  <p class="muted">
+    Envíos de tus ventas de los últimos 30 días (órdenes pagas), con su estado y
+    número de seguimiento. El estado y el seguimiento vienen directo de
+    MercadoLibre. Podés descargar/imprimir la etiqueta de despacho desde acá.
+  </p>
+
+  <% if (envios.length === 0) { %>
+    <p class="muted">No hay envíos en los últimos 30 días.</p>
+  <% } else { %>
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Producto</th>
+          <th>Comprador</th>
+          <th>Estado</th>
+          <th>Seguimiento</th>
+          <th>Etiqueta</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% envios.forEach(function(e) { %>
+          <% const info = estadoEnvioInfo(e.estado); %>
+          <tr>
+            <td class="muted"><%= new Date(e.fecha).toLocaleString('es-AR') %></td>
+            <td><%= e.producto %></td>
+            <td><%= e.comprador || '—' %></td>
+            <td>
+              <span class="badge <%= info.clase %>"><%= info.label %></span>
+              <% if (e.subEstado) { %>
+                <div class="muted" style="margin-top: 2px;"><%= e.subEstado %></div>
+              <% } %>
+            </td>
+            <td><%= e.tracking || '—' %></td>
+            <td><a href="/envios/<%= e.shipmentId %>/etiqueta" target="_blank" rel="noopener" class="link-btn">Ver etiqueta</a></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <% } %>
+
+<%- include('partials/foot') %>

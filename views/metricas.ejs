@@ -1,0 +1,86 @@
+<%
+const maxVentaSemana = Math.max(1, ...ventasPorSemana.map((b) => b.ventas));
+function formatoSemana(fechaInicio) {
+  return new Date(fechaInicio).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
+}
+%>
+<%- include('partials/head', { title: 'Métricas - SymL', active: 'metricas' }) %>
+
+  <h1>Métricas</h1>
+
+  <h2 style="font-size: 16px;">Ventas por semana (últimas <%= ventasPorSemana.length %> semanas)</h2>
+  <p class="muted">Suma de órdenes pagas por semana. Mismo criterio que el KPI de ventas del Dashboard.</p>
+  <div class="chart-barras">
+    <% ventasPorSemana.forEach(function(b) { %>
+      <div class="barra-col">
+        <div class="barra-valor">$<%= Math.round(b.ventas).toLocaleString('es-AR') %></div>
+        <div class="barra" style="height: <%= Math.max(2, Math.round((b.ventas / maxVentaSemana) * 100)) %>%;"></div>
+        <div class="barra-label"><%= formatoSemana(b.inicio) %></div>
+      </div>
+    <% }) %>
+  </div>
+
+  <h2 style="font-size: 16px; margin-top: 32px;">Productos más vendidos (últimos 30 días)</h2>
+  <% if (topProductos.length === 0) { %>
+    <p class="muted">Todavía no hay ventas en los últimos 30 días.</p>
+  <% } else { %>
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Unidades vendidas</th>
+          <th>Monto vendido</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% topProductos.forEach(function(p) { %>
+          <tr>
+            <td><%= p.titulo %></td>
+            <td><%= p.cantidad %></td>
+            <td>$<%= Math.round(p.monto).toLocaleString('es-AR') %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <% } %>
+
+  <h2 style="font-size: 16px; margin-top: 32px;">
+    Visitas y conversión (últimos 30 días)
+    <span class="badge badge-stock-bajo">Experimental</span>
+  </h2>
+  <p class="muted">
+    Esto es lo menos probado de esta tanda: no pudimos confirmar en vivo el endpoint de
+    visitas de MercadoLibre durante el desarrollo. Si ves "—" en vez de un número, puede
+    ser que el endpoint no sea el correcto — avisanos y lo ajustamos.
+  </p>
+  <% if (visitasError) { %>
+    <p class="error">No se pudieron calcular las visitas: <%= visitasError %></p>
+  <% } else if (visitas.length === 0) { %>
+    <p class="muted">No hay publicaciones activas o pausadas para mostrar.</p>
+  <% } else { %>
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Visitas</th>
+          <th>Vendidos</th>
+          <th>Conversión</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% visitas.forEach(function(v) { %>
+          <tr>
+            <td class="prod-cell">
+              <img src="<%= v.thumbnail %>" alt="" class="thumb" />
+              <%= v.titulo %>
+            </td>
+            <td><%= v.visitas != null ? v.visitas : '—' %></td>
+            <td><%= v.vendidos %></td>
+            <td><%= v.conversion != null ? v.conversion.toFixed(1) + '%' : '—' %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <% } %>
+
+<%- include('partials/foot') %>

@@ -308,9 +308,6 @@ app.post('/spl/:id/facturar', requireSplLogin, async (req, res) => {
 
 const SECCIONES_PROXIMAS = {
   ventas: 'Ventas reales',
-  envios: 'Envíos',
-  metricas: 'Métricas',
-  comparativa: 'Comparativa con la competencia',
 };
 
 app.get('/proximamente', requireLogin, (req, res) => {
@@ -425,6 +422,84 @@ app.get('/reputacion', requireLogin, requireMlConnected, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).send('Error consultando reputación: ' + err.message);
+  }
+});
+
+// ---------- Envíos ----------
+
+app.get('/envios', requireLogin, requireMlConnected, async (req, res) => {
+  try {
+    const envios = await ml.getEnvios(req.mlUserId, 30);
+    res.render('envios', { envios });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Error consultando envíos: ' + err.message);
+  }
+});
+
+app.get('/envios/:id/etiqueta', requireLogin, requireMlConnected, async (req, res) => {
+  try {
+    const pdf = await ml.getShipmentLabelPdf(req.params.id);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="etiqueta-${req.params.id}.pdf"`);
+    res.send(pdf);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('No se pudo obtener la etiqueta: ' + err.message);
+  }
+});
+
+// ---------- Métricas ----------
+
+app.get('/metricas', requireLogin, requireMlConnected, async (req, res) => {
+  try {
+    const ventasPorSemana = await ml.getVentasPorSemana(req.mlUserId, 8);
+    const topProductos = await ml.getTopProductos(req.mlUserId, 30, 10);
+
+    let visitas = [];
+    let visitasError = null;
+    try {
+      visitas = await ml.getVisitasYConversion(req.mlUserId, 30);
+    } catch (err) {
+      console.error('No se pudieron calcular visitas/conversión (experimental):', err);
+      visitasError = err.message;
+    }
+
+    res.render('metricas', { ventasPorSemana, topProductos, visitas, visitasError });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Error consultando métricas: ' + err.message);
+  }
+});
+
+// ---------- Comparativa con la competencia ----------
+
+app.get('/comparativa', requireLogin, requireMlConnected, async (req, res) => {
+  try {
+    const items = await ml.getItemsWithCostos(req.mlUserId);
+    const activos = items.filter((it) => it.estado === 'active');
+
+    const resumen = { ganando: 0, compartiendo: 0, perdiendo: 0, sinDato: 0 };
+    activos.forEach((it) => {
+      if (!it.precioAGanar) resumen.sinDato += 1;
+      else if (it.precioAGanar.status === 'winning') resumen.ganando += 1;
+      else if (it.precioAGanar.status === 'sharing_first_place') resumen.compartiendo += 1;
+      else resumen.perdiendo += 1;
+    });
+
+    const comparativas = await Promise.all(
+      activos.map(async (it) => {
+        const siteMatch = it.id.match(/^[A-Z]+/);
+        const siteId = siteMatch ? siteMatch[0] : 'MLA';
+        const mercado = it.categoryId ? await ml.getPrecioPromedioCategoria(it.categoryId, siteId) : null;
+        return { ...it, mercado };
+      })
+    );
+
+    res.render('comparativa', { comparativas, resumen });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Error consultando comparativa: ' + err.message);
   }
 });
 

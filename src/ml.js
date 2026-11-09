@@ -304,6 +304,7 @@ async function getItemsWithCostos(userId) {
       proveedor: costoRow ? costoRow.proveedor : null,
       precioAGanar,
       tieneVariantes: Array.isArray(it.variations) && it.variations.length > 0,
+      categoryId: it.category_id || null,
     };
   });
 }
@@ -601,6 +602,210 @@ async function crearPublicacionDesdeTemplate(templateId, datos) {
   return nuevo;
 }
 
+// ---------- Envíos ----------
+// Endpoint de etiquetas (/shipment_labels) y /shipments/{id} son parte
+// central y estable de la API de ML (muy usados por integradores hace años),
+// así que van con buena confianza, aunque -como el resto- no se pudieron
+// probar en vivo durante el desarrollo.
+
+async function getEnvios(userId, dias = 30) {
+  const hasta = new Date();
+  const desde = new Date(hasta.getTime() - dias * 24 * 60 * 60 * 1000);
+  let offset = 0;
+  const limit = 50;
+  const ordenes = [];
+
+  while (true) {
+    const params = new URLSearchParams({
+      seller: userId,
+      'order.status': 'paid',
+      'order.date_created.from': desde.toISOString(),
+      'order.date_created.to': hasta.toISOString(),
+      limit: String(limit),
+      offset: String(offset),
+    });
+    const data = await mlFetch(`/orders/search?${params.toString()}`);
+    const results = data.results || [];
+    ordenes.push(...results);
+    const total = data.paging ? data.paging.total : results.length;
+    offset += limit;
+    if (results.length === 0 || offset >= total) break;
+  }
+
+  const shipmentIds = [...new Set(ordenes.map((o) => o.shipping && o.shipping.id).filter(Boolean))];
+  const shipmentsEntries = await Promise.all(
+    shipmentIds.map(async (id) => {
+      try {
+        return [id, await mlFetch(`/shipments/${id}`)];
+      } catch (err) {
+        return [id, null];
+      }
+    })
+  );
+  const shipmentsMap = Object.fromEntries(shipmentsEntries);
+
+  return ordenes
+    .filter((o) => o.shipping && o.shipping.id)
+    .map((o) => {
+      const shipment = shipmentsMap[o.shipping.id];
+      const primerItem = o.order_items && o.order_items[0] && o.order_items[0].item;
+      return {
+        shipmentId: o.shipping.id,
+        orderId: o.id,
+        fecha: o.date_created,
+        producto: (primerItem && primerItem.title) || '—',
+        comprador: o.buyer ? o.buyer.nickname || null : null,
+        estado: shipment ? shipment.status : null,
+        subEstado: shipment ? shipment.substatus : null,
+        tracking: shipment ? shipment.tracking_number : null,
+      };
+    })
+    .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+}
+
+async function getShipmentLabelPdf(shipmentId) {
+  const tokens = await refreshIfNeeded();
+  if (!tokens) throw new Error('NOT_CONNECTED');
+  const res = await fetch(`${API}/shipment_labels?shipment_ids=${shipmentId}&response_type=pdf`, {
+    headers: { Authorization: `Bearer ${tokens.access_token}` },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    const err = new Error(data.message || `Error ${res.status} obteniendo la etiqueta`);
+    err.status = res.status;
+    throw err;
+  }
+  const arrayBuffer = await res.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
+// ---------- Métricas ----------
+
+// Agrupa las órdenes pagas de los últimos `dias` días por publicación.
+// Reusa el mismo patrón de paginado que getVentasYCMV.
+async function ventasPorProductoMap(userId, dias) {
+  const hasta = new Date();
+  const desde = new Date(hasta.getTime() - dias * 24 * 60 * 60 * 1000);
+  let offset = 0;
+  const limit = 50;
+  const stats = {};
+
+  while (true) {
+    const params = new URLSearchParams({
+      seller: userId,
+      'order.status': 'paid',
+      'order.date_created.from': desde.toISOString(),
+      'order.date_created.to': hasta.toISOString(),
+      limit: String(limit),
+      offset: String(offset),
+    });
+    const data = await mlFetch(`/orders/search?${params.toString()}`);
+    const results = data.results || [];
+    for (const order of results) {
+      for (const oi of order.order_items || []) {
+        const id = oi.item && oi.item.id;
+        if (!id) continue;
+        if (!stats[id]) stats[id] = { id, titulo: oi.item.title || id, cantidad: 0, monto: 0 };
+        stats[id].cantidad += oi.quantity || 1;
+        stats[id].monto += (oi.unit_price || 0) * (oi.quantity || 1);
+      }
+    }
+    const total = data.paging ? data.paging.total : results.length;
+    offset += limit;
+    if (results.length === 0 || offset >= total) break;
+  }
+  return stats;
+}
+
+async function getTopProductos(userId, dias = 30, limite = 10) {
+  const stats = await ventasPorProductoMap(userId, dias);
+  return Object.values(stats)
+    .sort((a, b) => b.cantidad - a.cantidad)
+    .slice(0, limite);
+}
+
+async function getVentasPorSemana(userId, semanas = 8) {
+  const hasta = new Date();
+  const desde = new Date(hasta.getTime() - semanas * 7 * 24 * 60 * 60 * 1000);
+  const msPorSemana = 7 * 24 * 60 * 60 * 1000;
+  const buckets = [];
+  for (let i = 0; i < semanas; i++) {
+    buckets.push({ inicio: new Date(desde.getTime() + i * msPorSemana), ventas: 0, ordenes: 0 });
+  }
+
+  let offset = 0;
+  const limit = 50;
+  while (true) {
+    const params = new URLSearchParams({
+      seller: userId,
+      'order.status': 'paid',
+      'order.date_created.from': desde.toISOString(),
+      'order.date_created.to': hasta.toISOString(),
+      limit: String(limit),
+      offset: String(offset),
+    });
+    const data = await mlFetch(`/orders/search?${params.toString()}`);
+    const results = data.results || [];
+    for (const order of results) {
+      const fecha = new Date(order.date_created);
+      let idx = Math.floor((fecha - desde) / msPorSemana);
+      if (idx < 0) idx = 0;
+      if (idx >= semanas) idx = semanas - 1;
+      buckets[idx].ventas += order.total_amount || 0;
+      buckets[idx].ordenes += 1;
+    }
+    const total = data.paging ? data.paging.total : results.length;
+    offset += limit;
+    if (results.length === 0 || offset >= total) break;
+  }
+  return buckets;
+}
+
+// Visitas por publicación. EXPERIMENTAL: a diferencia de /shipments o
+// /orders/search (muy probados), este endpoint lo conocemos con menos
+// seguridad y no se pudo confirmar en vivo durante el desarrollo. Si falla,
+// devolvemos null en vez de romper la página (igual que price_to_win).
+async function getVisitasItem(itemId, dias) {
+  try {
+    const data = await mlFetch(`/items/${itemId}/visits/time_window?last=${dias}&unit=day`);
+    return typeof data.total_visits === 'number' ? data.total_visits : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+async function getVisitasYConversion(userId, dias = 30) {
+  const items = await getItemsWithCostos(userId);
+  const activos = items.filter((it) => it.estado === 'active' || it.estado === 'paused');
+  const stats = await ventasPorProductoMap(userId, dias);
+  const resultados = await Promise.all(
+    activos.map(async (it) => {
+      const visitas = await getVisitasItem(it.id, dias);
+      const vendidos = stats[it.id] ? stats[it.id].cantidad : 0;
+      const conversion = visitas != null && visitas > 0 ? (vendidos / visitas) * 100 : null;
+      return { id: it.id, titulo: it.titulo, thumbnail: it.thumbnail, visitas, vendidos, conversion };
+    })
+  );
+  return resultados.sort((a, b) => (b.visitas || 0) - (a.visitas || 0));
+}
+
+// ---------- Comparativa con la competencia ----------
+// El precio promedio/mínimo de la categoría sale del buscador PÚBLICO de ML
+// (no hace falta estar autenticado), así que no usamos mlFetch acá.
+async function getPrecioPromedioCategoria(categoryId, siteId) {
+  try {
+    const res = await fetch(`${API}/sites/${siteId}/search?category=${categoryId}&limit=50`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    const precios = (data.results || []).map((r) => r.price).filter((p) => typeof p === 'number');
+    if (precios.length === 0) return null;
+    const promedio = precios.reduce((a, b) => a + b, 0) / precios.length;
+    return { promedio, minimo: Math.min(...precios), cantidad: precios.length };
+  } catch (err) {
+    return null;
+  }
+}
+
 module.exports = {
   authorizeUrl,
   exchangeCodeForToken,
@@ -628,4 +833,10 @@ module.exports = {
   getItemFull,
   getItemDescription,
   crearPublicacionDesdeTemplate,
+  getEnvios,
+  getShipmentLabelPdf,
+  getTopProductos,
+  getVentasPorSemana,
+  getVisitasYConversion,
+  getPrecioPromedioCategoria,
 };
