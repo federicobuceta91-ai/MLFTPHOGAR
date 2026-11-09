@@ -1,31 +1,20 @@
-<!doctype html>
-<html lang="es">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Preguntas - ML con More</title>
-  <link rel="stylesheet" href="/style.css" />
-</head>
-<body>
-  <%- include('partials/nav') %>
+<%- include('partials/head', { title: 'Preguntas - SymL', active: 'preguntas' }) %>
 
-  <main class="container">
-    <h1>Preguntas sin responder (<%= preguntas.length %>)</h1>
+  <h1>Preguntas sin responder (<%= preguntas.length %>)</h1>
 
-    <% if (preguntas.length === 0) { %>
-      <p class="muted">No hay preguntas pendientes. 🎉</p>
-    <% } %>
+  <% if (preguntas.length === 0) { %>
+    <p class="muted">No hay preguntas pendientes. 🎉</p>
+  <% } %>
 
-    <% preguntas.forEach(function(p) { %>
-      <div class="card">
-        <p class="pregunta-texto">"<%= p.text %>"</p>
-        <p class="muted">Publicación: <%= p.item_id %> · <%= new Date(p.date_created).toLocaleString('es-AR') %></p>
-        <form method="POST" action="/preguntas/<%= p.id %>/responder" class="responder-form">
-          <textarea name="respuesta" placeholder="Escribí la respuesta..." required></textarea>
-          <button type="submit">Responder</button>
-        </form>
-      </div>
-    <% }) %>
-  </main>
-</body>
-</html>
+  <% preguntas.forEach(function(p) { %>
+    <div class="card">
+      <p class="pregunta-texto">"<%= p.text %>"</p>
+      <p class="muted">Publicación: <%= p.item_id %> · <%= new Date(p.date_created).toLocaleString('es-AR') %></p>
+      <form method="POST" action="/preguntas/<%= p.id %>/responder" class="responder-form">
+        <textarea name="respuesta" placeholder="Escribí la respuesta..." required></textarea>
+        <button type="submit">Responder</button>
+      </form>
+    </div>
+  <% }) %>
+
+<%- include('partials/foot') %>

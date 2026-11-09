@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title><%= typeof title !== 'undefined' ? title : 'SymL' %></title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-name">SymL</div>
+        <div class="brand-sub">× FTP Hogar</div>
+      </div>
+      <nav class="side-nav">
+        <a href="/" class="<%= (typeof active !== 'undefined' && active === 'dashboard') ? 'active' : '' %>">Dashboard</a>
+        <a href="/proximamente?s=ventas" class="<%= (typeof active !== 'undefined' && active === 'ventas') ? 'active' : '' %> proximo">Ventas reales</a>
+        <a href="/publicaciones" class="<%= (typeof active !== 'undefined' && active === 'publicaciones') ? 'active' : '' %>">Publicaciones</a>
+        <a href="/proximamente?s=envios" class="<%= (typeof active !== 'undefined' && active === 'envios') ? 'active' : '' %> proximo">Envíos</a>
+        <a href="/preguntas" class="<%= (typeof active !== 'undefined' && active === 'preguntas') ? 'active' : '' %>">Preguntas</a>
+        <a href="/proximamente?s=metricas" class="<%= (typeof active !== 'undefined' && active === 'metricas') ? 'active' : '' %> proximo">Métricas</a>
+        <a href="/reputacion" class="<%= (typeof active !== 'undefined' && active === 'reputacion') ? 'active' : '' %>">Reputación</a>
+        <a href="/proximamente?s=comparativa" class="<%= (typeof active !== 'undefined' && active === 'comparativa') ? 'active' : '' %> proximo">Comparativa</a>
+        <a href="/configuracion" class="<%= (typeof active !== 'undefined' && active === 'configuracion') ? 'active' : '' %>">Configuración</a>
+      </nav>
+      <form method="POST" action="/logout" class="side-logout">
+        <button type="submit">Cerrar sesión</button>
+      </form>
+    </aside>
+    <main class="content">

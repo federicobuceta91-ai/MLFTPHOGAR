@@ -16,24 +16,56 @@ body {
   color: #333;
 }
 
-.nav {
-  background: var(--amarillo);
-  padding: 12px 20px;
+.app-shell {
   display: flex;
-  align-items: center;
-  gap: 20px;
-  flex-wrap: wrap;
+  min-height: 100vh;
+  align-items: stretch;
 }
 
-.nav-title { font-weight: 700; margin-right: auto; }
-.nav a { color: #333; text-decoration: none; font-weight: 600; }
-.nav a:hover { text-decoration: underline; }
-.nav-logout button {
+.sidebar {
+  width: 230px;
+  flex-shrink: 0;
+  background: #1a1a2e;
+  color: #eee;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 0;
+}
+
+.brand { padding: 0 20px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 10px; }
+.brand-name { font-size: 22px; font-weight: 800; color: var(--amarillo); letter-spacing: 0.5px; }
+.brand-sub { font-size: 12px; color: #999; margin-top: 2px; }
+
+.side-nav { display: flex; flex-direction: column; flex: 1; }
+.side-nav a {
+  color: #ccc;
+  text-decoration: none;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  border-left: 3px solid transparent;
+}
+.side-nav a:hover { background: rgba(255,255,255,0.06); color: white; }
+.side-nav a.active { background: rgba(255,255,255,0.1); color: white; border-left-color: var(--amarillo); }
+.side-nav a.proximo { color: #777; }
+.side-nav a.proximo::after { content: " · próx."; font-size: 10px; color: #666; }
+
+.side-logout { padding: 10px 20px 0; border-top: 1px solid rgba(255,255,255,0.1); margin-top: 10px; }
+.side-logout button {
   background: none;
   border: none;
   font-weight: 600;
   cursor: pointer;
-  color: #333;
+  color: #ccc;
+  font-size: 13px;
+  padding: 0;
+}
+.side-logout button:hover { color: white; }
+
+.content {
+  flex: 1;
+  padding: 28px 32px;
+  max-width: 1200px;
 }
 
 .container {

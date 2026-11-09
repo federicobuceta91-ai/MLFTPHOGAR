@@ -1,0 +1,31 @@
+<%- include('partials/head', { title: 'Próximamente - SymL', active: seccion }) %>
+
+  <h1><%= nombre %></h1>
+  <div class="card">
+    <p>Esta sección todavía está en construcción. La vamos a ir sumando en las próximas etapas.</p>
+    <% if (seccion === 'envios') { %>
+      <p class="muted">
+        La idea es poder ver los envíos pendientes y generar/imprimir las etiquetas
+        directo desde acá, usando la API de etiquetas de MercadoLibre.
+      </p>
+    <% } else if (seccion === 'comparativa') { %>
+      <p class="muted">
+        La idea es comparar tus precios contra publicaciones similares de otros
+        vendedores. Ojo: MercadoLibre no tiene un "ranking oficial" contra la
+        competencia, así que esto va a ser una estimación aproximada buscando
+        publicaciones parecidas, no un dato oficial de ellos.
+      </p>
+    <% } else if (seccion === 'metricas') { %>
+      <p class="muted">
+        Acá van a ir métricas de desempeño de las publicaciones (visitas,
+        conversión, etc.), separadas de la reputación del vendedor.
+      </p>
+    <% } else if (seccion === 'ventas') { %>
+      <p class="muted">
+        Acá vas a poder ver el historial completo de ventas reales con filtros
+        por fecha, no solo el resumen de los últimos 30 días que ves en el Dashboard.
+      </p>
+    <% } %>
+  </div>
+
+<%- include('partials/foot') %>

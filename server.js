@@ -80,9 +80,38 @@ async function requireMlConnected(req, res, next) {
   next();
 }
 
-// ---------- Dashboard: rentabilidad, stock y publicaciones ----------
+// ---------- Dashboard principal: KPIs ----------
 
 app.get('/', requireLogin, requireMlConnected, async (req, res) => {
+  let ventas = { ventas: 0, cmv: 0, margenPct: null, cmvIncompleto: false, dias: 30, cantidadOrdenes: 0 };
+  let ventasError = null;
+  try {
+    ventas = await ml.getVentasYCMV(req.mlUserId, 30);
+  } catch (err) {
+    console.error('Error calculando ventas/CMV:', err);
+    ventasError = err.message;
+  }
+
+  try {
+    const items = await ml.getItemsWithCostos(req.mlUserId);
+    const activas = items.filter((it) => it.estado === 'active').length;
+    const pausadas = items.filter((it) => it.estado === 'paused').length;
+    res.render('inicio', {
+      ventas,
+      ventasError,
+      totalPublicaciones: items.length,
+      activas,
+      pausadas,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Error consultando MercadoLibre: ' + err.message);
+  }
+});
+
+// ---------- Publicaciones: rentabilidad y stock ----------
+
+app.get('/publicaciones', requireLogin, requireMlConnected, async (req, res) => {
   try {
     const items = await ml.getItemsWithCostos(req.mlUserId);
     const filtro = req.query.estado || 'todas';
@@ -91,11 +120,26 @@ app.get('/', requireLogin, requireMlConnected, async (req, res) => {
       if (filtro === 'pausadas') return it.estado === 'paused';
       return true;
     });
-    res.render('dashboard', { items: filtrados, filtro, total: items.length });
+    res.render('publicaciones', { items: filtrados, filtro, total: items.length });
   } catch (err) {
     console.error(err);
     res.status(500).send('Error consultando MercadoLibre: ' + err.message);
   }
+});
+
+// ---------- Secciones todavía en construcción ----------
+
+const SECCIONES_PROXIMAS = {
+  ventas: 'Ventas reales',
+  envios: 'Envíos',
+  metricas: 'Métricas',
+  comparativa: 'Comparativa con la competencia',
+};
+
+app.get('/proximamente', requireLogin, (req, res) => {
+  const seccion = req.query.s;
+  const nombre = SECCIONES_PROXIMAS[seccion] || 'Próximamente';
+  res.render('proximamente', { seccion, nombre });
 });
 
 app.post('/productos/:id/costo', requireLogin, async (req, res) => {

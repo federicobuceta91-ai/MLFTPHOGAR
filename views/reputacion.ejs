@@ -1,56 +1,45 @@
-<!doctype html>
-<html lang="es">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Reputación - ML con More</title>
-  <link rel="stylesheet" href="/style.css" />
-</head>
-<body>
-  <%- include('partials/nav') %>
+<%- include('partials/head', { title: 'Reputación - SymL', active: 'reputacion' }) %>
 
-  <main class="container">
-    <h1>Reputación de <%= rep.nickname %></h1>
+  <h1>Reputación de <%= rep.nickname %></h1>
 
-    <div class="cards-grid">
-      <div class="card stat">
-        <div class="stat-label">Nivel</div>
-        <div class="stat-value"><%= rep.levelId || 'Sin datos aún' %></div>
-      </div>
-      <div class="card stat">
-        <div class="stat-label">MercadoLíder</div>
-        <div class="stat-value"><%= rep.powerSellerStatus || '—' %></div>
-      </div>
-      <div class="card stat">
-        <div class="stat-label">Ventas completadas</div>
-        <div class="stat-value"><%= rep.transactions && rep.transactions.completed != null ? rep.transactions.completed : '—' %></div>
-      </div>
-      <div class="card stat">
-        <div class="stat-label">Canceladas</div>
-        <div class="stat-value"><%= rep.transactions && rep.transactions.canceled != null ? rep.transactions.canceled : '—' %></div>
-      </div>
-      <div class="card stat">
-        <div class="stat-label">Reclamos</div>
-        <div class="stat-value">
-          <%= rep.metrics && rep.metrics.claims ? (rep.metrics.claims.rate * 100).toFixed(1) + '%' : '—' %>
-        </div>
-      </div>
-      <div class="card stat">
-        <div class="stat-label">Cancelaciones</div>
-        <div class="stat-value">
-          <%= rep.metrics && rep.metrics.cancellations ? (rep.metrics.cancellations.rate * 100).toFixed(1) + '%' : '—' %>
-        </div>
+  <div class="cards-grid">
+    <div class="card stat">
+      <div class="stat-label">Nivel</div>
+      <div class="stat-value"><%= rep.levelId || 'Sin datos aún' %></div>
+    </div>
+    <div class="card stat">
+      <div class="stat-label">MercadoLíder</div>
+      <div class="stat-value"><%= rep.powerSellerStatus || '—' %></div>
+    </div>
+    <div class="card stat">
+      <div class="stat-label">Ventas completadas</div>
+      <div class="stat-value"><%= rep.transactions && rep.transactions.completed != null ? rep.transactions.completed : '—' %></div>
+    </div>
+    <div class="card stat">
+      <div class="stat-label">Canceladas</div>
+      <div class="stat-value"><%= rep.transactions && rep.transactions.canceled != null ? rep.transactions.canceled : '—' %></div>
+    </div>
+    <div class="card stat">
+      <div class="stat-label">Reclamos</div>
+      <div class="stat-value">
+        <%= rep.metrics && rep.metrics.claims ? (rep.metrics.claims.rate * 100).toFixed(1) + '%' : '—' %>
       </div>
     </div>
+    <div class="card stat">
+      <div class="stat-label">Cancelaciones</div>
+      <div class="stat-value">
+        <%= rep.metrics && rep.metrics.cancellations ? (rep.metrics.cancellations.rate * 100).toFixed(1) + '%' : '—' %>
+      </div>
+    </div>
+  </div>
 
-    <% if (rep.transactions && rep.transactions.ratings) { %>
-      <h2>Calificaciones</h2>
-      <ul>
-        <li>Positivas: <%= rep.transactions.ratings.positive %></li>
-        <li>Neutras: <%= rep.transactions.ratings.neutral %></li>
-        <li>Negativas: <%= rep.transactions.ratings.negative %></li>
-      </ul>
-    <% } %>
-  </main>
-</body>
-</html>
+  <% if (rep.transactions && rep.transactions.ratings) { %>
+    <h2>Calificaciones</h2>
+    <ul>
+      <li>Positivas: <%= rep.transactions.ratings.positive %></li>
+      <li>Neutras: <%= rep.transactions.ratings.neutral %></li>
+      <li>Negativas: <%= rep.transactions.ratings.negative %></li>
+    </ul>
+  <% } %>
+
+<%- include('partials/foot') %>

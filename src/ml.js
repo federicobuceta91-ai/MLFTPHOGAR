@@ -229,6 +229,57 @@ async function getItemsWithCostos(userId) {
   });
 }
 
+async function getVentasYCMV(userId, dias = 30) {
+  const hasta = new Date();
+  const desde = new Date(hasta.getTime() - dias * 24 * 60 * 60 * 1000);
+
+  const { rows } = await pool.query('SELECT * FROM productos');
+  const costos = Object.fromEntries(
+    rows.map((r) => [r.ml_item_id, r.costo != null ? Number(r.costo) : null])
+  );
+
+  let ventas = 0;
+  let cmv = 0;
+  let cmvIncompleto = false;
+  let cantidadOrdenes = 0;
+  let offset = 0;
+  const limit = 50;
+
+  while (true) {
+    const params = new URLSearchParams({
+      seller: userId,
+      'order.status': 'paid',
+      'order.date_created.from': desde.toISOString(),
+      'order.date_created.to': hasta.toISOString(),
+      limit: String(limit),
+      offset: String(offset),
+    });
+    const data = await mlFetch(`/orders/search?${params.toString()}`);
+    const results = data.results || [];
+    cantidadOrdenes += results.length;
+
+    for (const order of results) {
+      ventas += order.total_amount || 0;
+      for (const oi of order.order_items || []) {
+        const itemId = oi.item && oi.item.id;
+        const costo = itemId ? costos[itemId] : null;
+        if (costo != null) {
+          cmv += costo * (oi.quantity || 1);
+        } else {
+          cmvIncompleto = true;
+        }
+      }
+    }
+
+    const total = data.paging ? data.paging.total : results.length;
+    offset += limit;
+    if (results.length === 0 || offset >= total) break;
+  }
+
+  const margenPct = ventas > 0 ? ((ventas - cmv) / ventas) * 100 : null;
+  return { ventas, cmv, margenPct, cmvIncompleto, dias, cantidadOrdenes };
+}
+
 async function setCosto(itemId, costo, notas) {
   await pool.query(
     `INSERT INTO productos (ml_item_id, costo, notas, updated_at)
@@ -283,6 +334,7 @@ module.exports = {
   exchangeCodeForToken,
   getStoredTokens,
   getItemsWithCostos,
+  getVentasYCMV,
   getConfig,
   setConfig,
   setCosto,

@@ -1,0 +1,42 @@
+<%- include('partials/head', { title: 'Dashboard - SymL', active: 'dashboard' }) %>
+
+  <h1>Dashboard</h1>
+  <p class="muted">Resumen de los últimos <%= ventas.dias %> días y estado actual del catálogo.</p>
+
+  <div class="cards-grid">
+    <div class="card stat">
+      <div class="stat-label">Ventas (<%= ventas.dias %> días)</div>
+      <div class="stat-value">$<%= ventas.ventas.toLocaleString('es-AR') %></div>
+      <div class="muted"><%= ventas.cantidadOrdenes %> órdenes pagadas</div>
+    </div>
+    <div class="card stat">
+      <div class="stat-label">CMV (costo de lo vendido)</div>
+      <div class="stat-value">$<%= ventas.cmv.toLocaleString('es-AR') %></div>
+      <% if (ventas.cmvIncompleto) { %>
+        <div class="muted">incompleto: faltan costos de algunos productos</div>
+      <% } %>
+    </div>
+    <div class="card stat">
+      <div class="stat-label">Margen %</div>
+      <div class="stat-value">
+        <%= ventas.margenPct != null ? ventas.margenPct.toFixed(0) + '%' : '—' %>
+      </div>
+    </div>
+    <div class="card stat">
+      <div class="stat-label">Publicaciones</div>
+      <div class="stat-value"><%= totalPublicaciones %></div>
+      <div class="muted"><%= activas %> activas · <%= pausadas %> pausadas</div>
+    </div>
+  </div>
+
+  <% if (ventasError) { %>
+    <div class="card" style="border-color: var(--rojo);">
+      <p class="muted">No se pudieron calcular las ventas reales todavía: <%= ventasError %></p>
+    </div>
+  <% } %>
+
+  <p class="muted">
+    Ver el detalle producto por producto en <a href="/publicaciones">Publicaciones</a>.
+  </p>
+
+<%- include('partials/foot') %>
