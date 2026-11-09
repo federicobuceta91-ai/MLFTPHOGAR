@@ -27,6 +27,7 @@ function estadoEnvioInfo(estado) {
   <% if (envios.length === 0) { %>
     <p class="muted">No hay envíos en los últimos 30 días.</p>
   <% } else { %>
+    <div class="tabla-wrap">
     <table class="tabla">
       <thead>
         <tr>
@@ -57,6 +58,7 @@ function estadoEnvioInfo(estado) {
         <% }) %>
       </tbody>
     </table>
+    </div>
   <% } %>
 
 <%- include('partials/foot') %>

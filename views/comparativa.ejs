@@ -30,6 +30,7 @@ function precioEstadoInfo(status) {
   <% if (comparativas.length === 0) { %>
     <p class="muted">No hay publicaciones activas para comparar.</p>
   <% } else { %>
+    <div class="tabla-wrap">
     <table class="tabla">
       <thead>
         <tr>
@@ -64,6 +65,7 @@ function precioEstadoInfo(status) {
         <% }) %>
       </tbody>
     </table>
+    </div>
   <% } %>
 
 <%- include('partials/foot') %>

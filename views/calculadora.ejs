@@ -1,0 +1,136 @@
+<%- include('partials/head', { title: 'Calculadora - SymL', active: 'calculadora' }) %>
+
+  <h1>Calculadora de rentabilidad</h1>
+  <p class="muted">
+    Para estimar antes de publicar (o para jugar con números): cargá el costo y una
+    comisión/impuestos aproximados y probá las dos opciones de abajo. Todo se calcula
+    acá mismo, en tu navegador — no guarda nada ni toca ninguna publicación real. Si
+    querés el margen de una publicación que ya tenés en MercadoLibre, mejor usá
+    <a href="/publicaciones">Publicaciones</a>, donde ya usamos la comisión y el envío
+    reales que informa MercadoLibre para esa publicación en particular.
+  </p>
+
+  <div class="card calc-card">
+    <h2 style="font-size: 16px; margin-top: 0;">Datos base</h2>
+    <div class="calc-grid">
+      <div>
+        <label for="calcCosto">Costo del producto ($)</label>
+        <input type="number" step="0.01" min="0" id="calcCosto" placeholder="ej: 500" />
+      </div>
+      <div>
+        <label for="calcComision">Comisión de MercadoLibre (% del precio de venta)</label>
+        <input type="number" step="0.1" min="0" max="100" id="calcComision" placeholder="ej: 13" />
+      </div>
+      <div>
+        <label for="calcEnvio">Costo de envío a tu cargo ($, si ofrecés envío gratis)</label>
+        <input type="number" step="0.01" min="0" id="calcEnvio" value="0" />
+      </div>
+      <div>
+        <label for="calcImpuestos">Impuestos (% del precio de venta)</label>
+        <input type="number" step="0.1" min="0" max="100" id="calcImpuestos" value="<%= impuestosPctDefault %>" />
+      </div>
+    </div>
+    <p class="muted" style="margin-top: 10px;">
+      La comisión de MercadoLibre varía según la categoría y el tipo de publicación —
+      revisala en el simulador de MercadoLibre o en una publicación parecida a la tuya
+      si no la sabés de memoria.
+    </p>
+  </div>
+
+  <div class="cards-grid" style="margin-top: 16px;">
+    <div class="card calc-card">
+      <h2 style="font-size: 16px; margin-top: 0;">Opción 1: ya tengo un precio, ¿qué margen me queda?</h2>
+      <label for="calcPrecio">Precio de venta ($)</label>
+      <input type="number" step="0.01" min="0" id="calcPrecio" placeholder="ej: 900" />
+      <div class="calc-resultado">
+        <div class="stat-label">Margen neto</div>
+        <div class="stat-value" id="resMargen">—</div>
+        <p class="muted" id="resMargenDetalle">Completá costo y precio de venta.</p>
+      </div>
+    </div>
+
+    <div class="card calc-card">
+      <h2 style="font-size: 16px; margin-top: 0;">Opción 2: quiero un margen, ¿qué precio pongo?</h2>
+      <label for="calcMargenObjetivo">Margen objetivo (% sobre el costo)</label>
+      <input type="number" step="0.1" min="0" id="calcMargenObjetivo" placeholder="ej: 30" />
+      <div class="calc-resultado">
+        <div class="stat-label">Precio sugerido</div>
+        <div class="stat-value" id="resPrecio">—</div>
+        <p class="muted" id="resPrecioDetalle">Completá costo y margen objetivo.</p>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  function num(id) {
+    var el = document.getElementById(id);
+    if (!el) return null;
+    var v = parseFloat(el.value);
+    return isNaN(v) ? null : v;
+  }
+  function fmt(n) {
+    var signo = n < 0 ? '-' : '';
+    return signo + '$' + Math.abs(n).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function recalcular() {
+    var costo = num('calcCosto');
+    var comisionPct = num('calcComision') || 0;
+    var envio = num('calcEnvio') || 0;
+    var impuestosPct = num('calcImpuestos') || 0;
+
+    // Opción 1: a partir de un precio de venta, calcula el margen neto.
+    var precio = num('calcPrecio');
+    var resMargen = document.getElementById('resMargen');
+    var resMargenDetalle = document.getElementById('resMargenDetalle');
+    if (costo != null && precio != null) {
+      var comisionMonto = (precio * comisionPct) / 100;
+      var impuestoMonto = (precio * impuestosPct) / 100;
+      var margen = precio - costo - comisionMonto - envio - impuestoMonto;
+      var margenPct = costo > 0 ? (margen / costo) * 100 : null;
+      resMargen.textContent = fmt(margen);
+      resMargen.style.color = margen < 0 ? 'var(--rojo)' : 'var(--verde)';
+      resMargenDetalle.textContent =
+        'Comisión estimada: ' + fmt(comisionMonto) + ' · Impuesto: ' + fmt(impuestoMonto) +
+        (margenPct != null ? ' · Margen: ' + margenPct.toFixed(1) + '% sobre el costo' : '');
+    } else {
+      resMargen.textContent = '—';
+      resMargen.style.color = '';
+      resMargenDetalle.textContent = 'Completá costo y precio de venta.';
+    }
+
+    // Opción 2: a partir de un margen objetivo (% sobre el costo), calcula el
+    // precio de venta necesario. Como acá la comisión se ingresa como % del
+    // precio (no como monto fijo), entra en el divisor junto con impuestos.
+    var margenObjetivoPct = num('calcMargenObjetivo');
+    var resPrecio = document.getElementById('resPrecio');
+    var resPrecioDetalle = document.getElementById('resPrecioDetalle');
+    if (costo != null && margenObjetivoPct != null) {
+      var divisor = 1 - comisionPct / 100 - impuestosPct / 100;
+      if (divisor > 0) {
+        var objetivo = costo * (margenObjetivoPct / 100);
+        var precioSugerido = (objetivo + costo + envio) / divisor;
+        resPrecio.textContent = fmt(precioSugerido);
+        resPrecio.style.color = '';
+        resPrecioDetalle.textContent =
+          'Con ' + comisionPct + '% de comisión y ' + impuestosPct + '% de impuestos, ese precio te deja ' +
+          margenObjetivoPct + '% de margen sobre el costo.';
+      } else {
+        resPrecio.textContent = '—';
+        resPrecioDetalle.textContent = 'La comisión más los impuestos suman 100% o más: no hay precio posible.';
+      }
+    } else {
+      resPrecio.textContent = '—';
+      resPrecioDetalle.textContent = 'Completá costo y margen objetivo.';
+    }
+  }
+
+  ['calcCosto', 'calcComision', 'calcEnvio', 'calcImpuestos', 'calcPrecio', 'calcMargenObjetivo'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', recalcular);
+  });
+  recalcular();
+})();
+</script>
+
+<%- include('partials/foot') %>

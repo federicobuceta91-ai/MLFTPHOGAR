@@ -29,9 +29,6 @@ const altaPrioridad = propuestas.filter((p) => p.prioridad === 'alta').length;
     "Descartar" lo saca de esta lista (podés reactivarlo después, al final de la página).
   </p>
 
-  <% if (aplicado) { %>
-    <p class="muted" style="color: var(--verde); font-weight: 700;">✔ Precio actualizado en MercadoLibre.</p>
-  <% } %>
   <% if (errorAccion) { %>
     <p class="error"><%= errorAccion %></p>
   <% } %>
@@ -46,6 +43,7 @@ const altaPrioridad = propuestas.filter((p) => p.prioridad === 'alta').length;
   <% if (propuestas.length === 0) { %>
     <p class="muted">No hay sugerencias por ahora. 🎉</p>
   <% } else { %>
+    <div class="tabla-wrap">
     <table class="tabla">
       <thead>
         <tr>
@@ -68,7 +66,7 @@ const altaPrioridad = propuestas.filter((p) => p.prioridad === 'alta').length;
             <td><%= p.descripcion %></td>
             <td>
               <% if (p.tipo === 'margen_bajo' || p.tipo === 'precio_buybox') { %>
-                <form method="POST" action="/agente/<%= p.itemId %>/aplicar-precio" class="inline-form">
+                <form method="POST" action="/productos/<%= p.itemId %>/precio" class="inline-form">
                   <input type="hidden" name="precio" value="<%= p.valorSugerido %>" />
                   <button type="submit" class="link-btn">Aplicar precio: $<%= p.valorSugerido %></button>
                 </form>
@@ -89,12 +87,14 @@ const altaPrioridad = propuestas.filter((p) => p.prioridad === 'alta').length;
         <% }) %>
       </tbody>
     </table>
+    </div>
   <% } %>
 
   <h2 style="font-size: 16px; margin-top: 32px;">Descartadas (<%= descartes.length %>)</h2>
   <% if (descartes.length === 0) { %>
     <p class="muted">No descartaste ninguna sugerencia.</p>
   <% } else { %>
+    <div class="tabla-wrap">
     <table class="tabla">
       <thead>
         <tr>
@@ -119,6 +119,7 @@ const altaPrioridad = propuestas.filter((p) => p.prioridad === 'alta').length;
         <% }) %>
       </tbody>
     </table>
+    </div>
   <% } %>
 
 <%- include('partials/foot') %>

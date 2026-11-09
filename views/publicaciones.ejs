@@ -97,6 +97,7 @@ function precioEstadoInfo(status) {
     </div>
   </form>
 
+  <div class="tabla-wrap">
   <table class="tabla">
     <thead>
       <tr>
@@ -147,7 +148,34 @@ function precioEstadoInfo(status) {
               <div class="muted" style="margin-top: 4px;">Resolvé esto desde MercadoLibre</div>
             <% } %>
           </td>
-          <td>$<%= it.precio %></td>
+          <td>
+            $<%= it.precio %>
+            <% if (it.costo != null) { %>
+              <form
+                method="POST"
+                action="/productos/<%= it.id %>/precio"
+                class="inline-form margen-objetivo-form"
+                style="margin-top: 6px;"
+                data-costo="<%= it.costo %>"
+                data-comision="<%= it.comisionML || 0 %>"
+                data-envio="<%= it.envioCost || 0 %>"
+                data-impuestos="<%= it.impuestosPct || 0 %>"
+              >
+                <input
+                  type="number"
+                  step="0.1"
+                  name="margenObjetivoPct"
+                  placeholder="% marg."
+                  class="input-chico margen-objetivo-input"
+                  style="width: 70px;"
+                  title="Margen objetivo (% sobre el costo): calcula el precio para llegar a ese margen"
+                />
+                <input type="hidden" name="precio" class="precio-sugerido-hidden" />
+                <button type="submit" class="link-btn precio-sugerido-btn" disabled>Aplicar</button>
+                <div class="muted precio-sugerido-preview"></div>
+              </form>
+            <% } %>
+          </td>
           <td>
             <form method="POST" action="/productos/<%= it.id %>/costo" class="inline-form">
               <input type="number" step="0.01" name="costo" value="<%= it.costo != null ? it.costo : '' %>" placeholder="costo" class="input-chico" />
@@ -230,5 +258,55 @@ function precioEstadoInfo(status) {
       <% } %>
     </tbody>
   </table>
+  </div>
+
+  <script>
+  (function () {
+    // Para cada fila: a partir de un margen objetivo (% sobre el costo), calcula
+    // el precio de venta necesario, usando los mismos datos (costo, comisión ML,
+    // envío, impuestos) que ya tenemos cargados del lado del servidor para esa
+    // publicación puntual — es la misma fórmula que usa el Agente de mejoras.
+    function calcularPrecioSugerido(costo, comision, envio, impuestosPct, margenObjetivoPct) {
+      var divisor = 1 - impuestosPct / 100;
+      if (divisor <= 0) return null;
+      var objetivo = costo * (margenObjetivoPct / 100);
+      return Math.ceil((objetivo + costo + comision + envio) / divisor);
+    }
+
+    document.querySelectorAll('.margen-objetivo-form').forEach(function (form) {
+      var costo = parseFloat(form.dataset.costo) || 0;
+      var comision = parseFloat(form.dataset.comision) || 0;
+      var envio = parseFloat(form.dataset.envio) || 0;
+      var impuestosPct = parseFloat(form.dataset.impuestos) || 0;
+      var input = form.querySelector('.margen-objetivo-input');
+      var hidden = form.querySelector('.precio-sugerido-hidden');
+      var boton = form.querySelector('.precio-sugerido-btn');
+      var preview = form.querySelector('.precio-sugerido-preview');
+
+      function actualizar() {
+        var pct = parseFloat(input.value);
+        if (isNaN(pct)) {
+          hidden.value = '';
+          boton.disabled = true;
+          preview.textContent = '';
+          return;
+        }
+        var sugerido = calcularPrecioSugerido(costo, comision, envio, impuestosPct, pct);
+        if (sugerido == null) {
+          hidden.value = '';
+          boton.disabled = true;
+          preview.textContent = 'Impuestos ≥ 100%: no hay precio posible.';
+          return;
+        }
+        hidden.value = sugerido;
+        boton.disabled = false;
+        boton.textContent = 'Aplicar: $' + sugerido;
+        preview.textContent = '';
+      }
+
+      input.addEventListener('input', actualizar);
+    });
+  })();
+  </script>
 
 <%- include('partials/foot') %>

@@ -76,6 +76,7 @@
   <% if (reclamos.length === 0) { %>
     <p class="muted">No hay reclamos para mostrar (o todavía no pudimos confirmar cómo traerlos).</p>
   <% } else { %>
+    <div class="tabla-wrap">
     <table class="tabla">
       <thead>
         <tr>
@@ -98,6 +99,7 @@
         <% }) %>
       </tbody>
     </table>
+    </div>
   <% } %>
 
 <%- include('partials/foot') %>

@@ -12,25 +12,29 @@
   <div class="app-shell">
     <aside class="sidebar">
       <div class="brand">
-        <img src="/img/logo.png" alt="SymL" class="brand-logo" />
-        <div class="brand-sub">× FTP Hogar</div>
+        <img src="/img/icon-192.png" alt="SymL" class="brand-icon" />
+        <div class="brand-text">
+          <img src="/img/logo.png" alt="SymL" class="brand-logo" />
+          <div class="brand-sub">× FTP Hogar</div>
+        </div>
       </div>
       <nav class="side-nav">
-        <a href="/" class="<%= (typeof active !== 'undefined' && active === 'dashboard') ? 'active' : '' %>">Dashboard</a>
-        <a href="/proximamente?s=ventas" class="<%= (typeof active !== 'undefined' && active === 'ventas') ? 'active' : '' %> proximo">Ventas reales</a>
-        <a href="/publicaciones" class="<%= (typeof active !== 'undefined' && active === 'publicaciones') ? 'active' : '' %>">Publicaciones</a>
-        <a href="/nueva-publicacion" class="<%= (typeof active !== 'undefined' && active === 'nueva-publicacion') ? 'active' : '' %>">Nueva publicación</a>
-        <a href="/agente" class="<%= (typeof active !== 'undefined' && active === 'agente') ? 'active' : '' %>">Agente</a>
-        <a href="/drop-shipping" class="<%= (typeof active !== 'undefined' && active === 'drop-shipping') ? 'active' : '' %>">Drop Shipping</a>
-        <a href="/envios" class="<%= (typeof active !== 'undefined' && active === 'envios') ? 'active' : '' %>">Envíos</a>
-        <a href="/preguntas" class="<%= (typeof active !== 'undefined' && active === 'preguntas') ? 'active' : '' %>">Preguntas</a>
-        <a href="/metricas" class="<%= (typeof active !== 'undefined' && active === 'metricas') ? 'active' : '' %>">Métricas</a>
-        <a href="/reputacion" class="<%= (typeof active !== 'undefined' && active === 'reputacion') ? 'active' : '' %>">Reputación</a>
-        <a href="/comparativa" class="<%= (typeof active !== 'undefined' && active === 'comparativa') ? 'active' : '' %>">Comparativa</a>
-        <a href="/configuracion" class="<%= (typeof active !== 'undefined' && active === 'configuracion') ? 'active' : '' %>">Configuración</a>
+        <a href="/" class="<%= (typeof active !== 'undefined' && active === 'dashboard') ? 'active' : '' %>"><span class="nav-icon">📊</span><span class="nav-label">Dashboard</span></a>
+        <a href="/proximamente?s=ventas" class="<%= (typeof active !== 'undefined' && active === 'ventas') ? 'active' : '' %> proximo"><span class="nav-icon">💰</span><span class="nav-label">Ventas reales</span></a>
+        <a href="/publicaciones" class="<%= (typeof active !== 'undefined' && active === 'publicaciones') ? 'active' : '' %>"><span class="nav-icon">🏷️</span><span class="nav-label">Publicaciones</span></a>
+        <a href="/nueva-publicacion" class="<%= (typeof active !== 'undefined' && active === 'nueva-publicacion') ? 'active' : '' %>"><span class="nav-icon">➕</span><span class="nav-label">Nueva publicación</span></a>
+        <a href="/calculadora" class="<%= (typeof active !== 'undefined' && active === 'calculadora') ? 'active' : '' %>"><span class="nav-icon">🧮</span><span class="nav-label">Calculadora</span></a>
+        <a href="/agente" class="<%= (typeof active !== 'undefined' && active === 'agente') ? 'active' : '' %>"><span class="nav-icon">🤖</span><span class="nav-label">Agente</span></a>
+        <a href="/drop-shipping" class="<%= (typeof active !== 'undefined' && active === 'drop-shipping') ? 'active' : '' %>"><span class="nav-icon">🚚</span><span class="nav-label">Drop Shipping</span></a>
+        <a href="/envios" class="<%= (typeof active !== 'undefined' && active === 'envios') ? 'active' : '' %>"><span class="nav-icon">📦</span><span class="nav-label">Envíos</span></a>
+        <a href="/preguntas" class="<%= (typeof active !== 'undefined' && active === 'preguntas') ? 'active' : '' %>"><span class="nav-icon">💬</span><span class="nav-label">Preguntas</span></a>
+        <a href="/metricas" class="<%= (typeof active !== 'undefined' && active === 'metricas') ? 'active' : '' %>"><span class="nav-icon">📈</span><span class="nav-label">Métricas</span></a>
+        <a href="/reputacion" class="<%= (typeof active !== 'undefined' && active === 'reputacion') ? 'active' : '' %>"><span class="nav-icon">⭐</span><span class="nav-label">Reputación</span></a>
+        <a href="/comparativa" class="<%= (typeof active !== 'undefined' && active === 'comparativa') ? 'active' : '' %>"><span class="nav-icon">⚖️</span><span class="nav-label">Comparativa</span></a>
+        <a href="/configuracion" class="<%= (typeof active !== 'undefined' && active === 'configuracion') ? 'active' : '' %>"><span class="nav-icon">⚙️</span><span class="nav-label">Configuración</span></a>
       </nav>
       <form method="POST" action="/logout" class="side-logout">
-        <button type="submit">Cerrar sesión</button>
+        <button type="submit"><span class="nav-icon">🚪</span><span class="nav-label">Cerrar sesión</span></button>
       </form>
     </aside>
     <main class="content">

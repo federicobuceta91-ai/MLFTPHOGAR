@@ -24,6 +24,7 @@ function formatoSemana(fechaInicio) {
   <% if (topProductos.length === 0) { %>
     <p class="muted">Todavía no hay ventas en los últimos 30 días.</p>
   <% } else { %>
+    <div class="tabla-wrap">
     <table class="tabla">
       <thead>
         <tr>
@@ -42,6 +43,7 @@ function formatoSemana(fechaInicio) {
         <% }) %>
       </tbody>
     </table>
+    </div>
   <% } %>
 
   <h2 style="font-size: 16px; margin-top: 32px;">
@@ -58,6 +60,7 @@ function formatoSemana(fechaInicio) {
   <% } else if (visitas.length === 0) { %>
     <p class="muted">No hay publicaciones activas o pausadas para mostrar.</p>
   <% } else { %>
+    <div class="tabla-wrap">
     <table class="tabla">
       <thead>
         <tr>
@@ -81,6 +84,7 @@ function formatoSemana(fechaInicio) {
         <% }) %>
       </tbody>
     </table>
+    </div>
   <% } %>
 
 <%- include('partials/foot') %>

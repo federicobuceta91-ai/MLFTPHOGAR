@@ -17,6 +17,7 @@
       quieras probar.
     </p>
   <% } else { %>
+    <div class="tabla-wrap">
     <table class="tabla">
       <thead>
         <tr>
@@ -50,12 +51,14 @@
         <% }) %>
       </tbody>
     </table>
+    </div>
   <% } %>
 
   <h2 style="font-size: 16px; margin-top: 28px;">Órdenes generadas</h2>
   <% if (ordenes.length === 0) { %>
     <p class="muted">Todavía no simulaste ninguna venta Drop.</p>
   <% } else { %>
+    <div class="tabla-wrap">
     <table class="tabla">
       <thead>
         <tr>
@@ -93,6 +96,7 @@
         <% }) %>
       </tbody>
     </table>
+    </div>
   <% } %>
 
   <p class="muted" style="margin-top: 24px;">

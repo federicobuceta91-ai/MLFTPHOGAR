@@ -22,18 +22,34 @@ body {
   align-items: stretch;
 }
 
+/* Sidebar angosta (solo íconos) por defecto; al pasar el mouse por arriba se
+   despliega con las etiquetas. Es "position: fixed" a propósito, para que al
+   desplegarse se superponga al contenido en vez de correrlo de lugar (si no,
+   cada hover reacomodaría toda la página). En pantallas táctiles (sin mouse)
+   no hay forma de "pasar por arriba", así que queda angosta siempre — es la
+   limitación conocida de este enfoque, pensado sobre todo para desktop. */
 .sidebar {
-  width: 230px;
-  flex-shrink: 0;
+  width: 60px;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
   background: #1a1a2e;
   color: #eee;
   display: flex;
   flex-direction: column;
   padding: 20px 0;
+  overflow: hidden;
+  transition: width 0.15s ease;
+  z-index: 20;
 }
+.sidebar:hover { width: 230px; }
 
-.brand { padding: 0 20px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 10px; }
-.brand-logo { width: 100%; max-width: 190px; height: auto; display: block; }
+.brand { padding: 0 14px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 10px; display: flex; align-items: center; gap: 10px; white-space: nowrap; }
+.brand-icon { width: 32px; height: 32px; border-radius: 6px; flex-shrink: 0; }
+.brand-text { opacity: 0; transition: opacity 0.1s; }
+.sidebar:hover .brand-text { opacity: 1; }
+.brand-logo { width: 140px; height: auto; display: block; }
 .brand-sub { font-size: 12px; color: #999; margin-top: 2px; }
 
 .side-nav { display: flex; flex-direction: column; flex: 1; }
@@ -44,13 +60,20 @@ body {
   font-size: 14px;
   font-weight: 600;
   border-left: 3px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  white-space: nowrap;
 }
+.side-nav a .nav-icon { width: 20px; text-align: center; flex-shrink: 0; font-size: 15px; }
+.side-nav a .nav-label { opacity: 0; transition: opacity 0.1s; }
+.sidebar:hover .side-nav a .nav-label { opacity: 1; }
 .side-nav a:hover { background: rgba(255,255,255,0.06); color: white; }
 .side-nav a.active { background: rgba(255,255,255,0.1); color: white; border-left-color: var(--amarillo); }
 .side-nav a.proximo { color: #777; }
-.side-nav a.proximo::after { content: " · próx."; font-size: 10px; color: #666; }
+.side-nav a.proximo .nav-label::after { content: " · próx."; font-size: 10px; color: #666; }
 
-.side-logout { padding: 10px 20px 0; border-top: 1px solid rgba(255,255,255,0.1); margin-top: 10px; }
+.side-logout { padding: 10px 20px 0; border-top: 1px solid rgba(255,255,255,0.1); margin-top: 10px; white-space: nowrap; }
 .side-logout button {
   background: none;
   border: none;
@@ -59,14 +82,24 @@ body {
   color: #ccc;
   font-size: 13px;
   padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
+.side-logout button .nav-icon { width: 20px; text-align: center; flex-shrink: 0; font-size: 15px; }
+.side-logout button .nav-label { opacity: 0; transition: opacity 0.1s; }
+.sidebar:hover .side-logout button .nav-label { opacity: 1; }
 .side-logout button:hover { color: white; }
 
 .content {
   flex: 1;
+  min-width: 0; /* para que .tabla-wrap pueda scrollear adentro en vez de ensanchar toda la página */
+  margin-left: 60px;
   padding: 28px 32px;
-  max-width: 1200px;
+  max-width: 1600px;
 }
+
+.tabla-wrap { overflow-x: auto; }
 
 .container {
   max-width: 1100px;
@@ -266,3 +299,29 @@ h1 { font-size: 22px; }
 .resumen-pill.compartiendo { background: #fff4e0; color: #b8650a; }
 .resumen-pill.perdiendo { background: #fdeceb; color: var(--rojo); }
 .resumen-pill.sin-dato { background: #eee; color: var(--gris); }
+
+/* Calculadora de rentabilidad */
+.calc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+.calc-grid label, .calc-card label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gris);
+  margin-bottom: 4px;
+}
+.calc-grid input, .calc-card input {
+  width: 100%;
+  padding: 7px 8px;
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+}
+.calc-resultado { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--borde); }
+.calc-resultado .stat-value { margin-bottom: 4px; }
+
+/* Precio por margen objetivo (inline, en Publicaciones) */
+.margen-objetivo-form { flex-wrap: wrap; }
+.margen-objetivo-form .precio-sugerido-preview { font-size: 12px; white-space: nowrap; }

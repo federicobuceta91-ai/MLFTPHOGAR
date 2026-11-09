@@ -359,6 +359,25 @@ app.post('/productos/:id/stock', requireLogin, requireMlConnected, async (req, r
   }
 });
 
+app.post('/productos/:id/precio', requireLogin, requireMlConnected, async (req, res) => {
+  try {
+    await ml.setItemPrice(req.params.id, Number(req.body.precio));
+    res.redirect(req.get('Referer') || '/');
+  } catch (err) {
+    console.error(err);
+    redirectConError(req, res, 'MercadoLibre no permitió cambiar el precio: ' + err.message);
+  }
+});
+
+// ---------- Calculadora de rentabilidad (estimador suelto, no toca ML) ----------
+
+app.get('/calculadora', requireLogin, async (req, res) => {
+  const config = await ml.getConfig();
+  res.render('calculadora', {
+    impuestosPctDefault: Number(config.impuestos_pct) || 0,
+  });
+});
+
 // ---------- Configuración (impuestos, etc.) ----------
 
 app.get('/configuracion', requireLogin, async (req, res) => {
@@ -514,22 +533,11 @@ app.get('/agente', requireLogin, requireMlConnected, async (req, res) => {
     res.render('agente', {
       propuestas,
       descartes,
-      aplicado: req.query.aplicado || null,
       errorAccion: req.query.errorAccion || null,
     });
   } catch (err) {
     console.error(err);
     res.status(500).send('Error consultando el agente: ' + err.message);
-  }
-});
-
-app.post('/agente/:id/aplicar-precio', requireLogin, requireMlConnected, async (req, res) => {
-  try {
-    await ml.setItemPrice(req.params.id, Number(req.body.precio));
-    res.redirect('/agente?aplicado=1');
-  } catch (err) {
-    console.error(err);
-    redirectConError(req, res, 'MercadoLibre no permitió cambiar el precio: ' + err.message);
   }
 });
 
