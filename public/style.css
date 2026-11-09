@@ -179,26 +179,34 @@ h1 { font-size: 22px; }
   align-items: center;
   justify-content: center;
   min-height: 100vh;
+  background: #1a1a2e;
 }
 
 .login-card {
-  background: white;
+  background: #22223f;
   padding: 32px;
   border-radius: 10px;
   width: 320px;
   text-align: center;
-  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.07);
 }
 
 .login-logo { width: 100%; max-width: 220px; height: auto; display: block; margin: 0 auto 4px; }
+.login-sub { color: #999; font-size: 13px; margin: -8px 0 4px; }
 
-.login-card label { display: block; text-align: left; margin-top: 12px; font-size: 13px; font-weight: 600; }
+.login-card h1 { color: #f0f0f0; margin-top: 0; }
+.login-card .muted { color: #999; }
+
+.login-card label { display: block; text-align: left; margin-top: 12px; font-size: 13px; font-weight: 600; color: #ccc; }
 .login-card input {
   width: 100%;
   padding: 8px;
   margin-top: 4px;
-  border: 1px solid var(--borde);
+  border: 1px solid rgba(255,255,255,0.15);
   border-radius: 6px;
+  background: white;
+  color: #333;
 }
 
 .login-card button, .boton-grande {
