@@ -128,17 +128,45 @@ async function getItemsDetails(ids) {
   return all;
 }
 
+async function getComisionML(item) {
+  try {
+    const siteMatch = item.id.match(/^[A-Z]+/);
+    const siteId = siteMatch ? siteMatch[0] : 'MLA';
+    const params = new URLSearchParams({
+      price: item.price,
+      category_id: item.category_id,
+    });
+    const data = await mlFetch(`/sites/${siteId}/listing_prices?${params.toString()}`);
+    const opciones = Array.isArray(data) ? data : [];
+    const match =
+      opciones.find((o) => o.listing_type_id === item.listing_type_id) || opciones[0];
+    if (!match) return null;
+    if (typeof match.sale_fee_amount === 'number') return match.sale_fee_amount;
+    if (match.sale_fee_details && typeof match.sale_fee_details.percentage_fee === 'number') {
+      return (item.price * match.sale_fee_details.percentage_fee) / 100;
+    }
+    return null;
+  } catch (err) {
+    console.error('No se pudo obtener la comisión de ML para', item.id, err.message);
+    return null;
+  }
+}
+
 async function getItemsWithCostos(userId) {
   const ids = await getAllItemIds(userId);
   const items = await getItemsDetails(ids);
   const { rows } = await pool.query('SELECT * FROM productos');
   const costos = Object.fromEntries(rows.map((r) => [r.ml_item_id, r]));
 
-  return items.map((it) => {
+  const comisiones = await Promise.all(items.map((it) => getComisionML(it)));
+
+  return items.map((it, idx) => {
     const costoRow = costos[it.id];
     const costo = costoRow ? Number(costoRow.costo) : null;
     const precio = it.price;
-    const margen = costo != null ? precio - costo : null;
+    const comisionML = comisiones[idx];
+    const margenBruto = costo != null ? precio - costo : null;
+    const margen = costo != null ? precio - costo - (comisionML || 0) : null;
     const margenPct = costo != null && costo > 0 ? ((margen / costo) * 100) : null;
     return {
       id: it.id,
@@ -149,6 +177,8 @@ async function getItemsWithCostos(userId) {
       permalink: it.permalink,
       thumbnail: it.thumbnail,
       costo,
+      comisionML,
+      margenBruto,
       margen,
       margenPct,
       notas: costoRow ? costoRow.notas : null,

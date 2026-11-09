@@ -25,7 +25,8 @@
           <th>Estado</th>
           <th>Precio</th>
           <th>Costo</th>
-          <th>Margen</th>
+          <th>Comisión ML</th>
+          <th>Margen neto</th>
           <th>Stock</th>
           <th>Acciones</th>
         </tr>
@@ -54,6 +55,13 @@
                 <input type="number" step="0.01" name="costo" value="<%= it.costo != null ? it.costo : '' %>" placeholder="costo" class="input-chico" />
                 <button type="submit" class="link-btn">Guardar</button>
               </form>
+            </td>
+            <td>
+              <% if (it.comisionML != null) { %>
+                $<%= it.comisionML.toFixed(2) %>
+              <% } else { %>
+                <span class="muted">sin datos</span>
+              <% } %>
             </td>
             <td>
               <% if (it.margen != null) { %>
