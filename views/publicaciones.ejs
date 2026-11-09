@@ -8,6 +8,43 @@ function linkOrden(campo, label) {
   const flecha = sort === campo ? (dir === 'asc' ? ' ▲' : ' ▼') : '';
   return `<a href="/publicaciones?${params.toString()}" class="th-link">${label}${flecha}</a>`;
 }
+
+// Traducción de estado/sub_status. MercadoLibre tiene más estados que
+// activa/pausada; los que no reconocemos los mostramos tal cual los manda ML.
+const ESTADOS = {
+  active: { label: 'Activa', clase: 'badge-activo' },
+  paused: { label: 'Pausada', clase: 'badge-pausado' },
+  under_review: { label: 'En revisión', clase: 'badge-stock-bajo' },
+  closed: { label: 'Cerrada', clase: 'badge-pausado' },
+  inactive: { label: 'Inactiva', clase: 'badge-stock-bajo' },
+};
+function estadoInfo(estado) {
+  return ESTADOS[estado] || { label: estado, clase: 'badge-pausado' };
+}
+function esInactivaPorPoliticas(it) {
+  return it.estado !== 'active' && it.estado !== 'paused';
+}
+const SUB_ESTADOS = {
+  out_of_stock: 'sin stock',
+  deleted: 'eliminada',
+  suspended: 'suspendida',
+  expired: 'vencida',
+  payment_required: 'pago pendiente',
+  price_mismatch: 'precio no coincide',
+  forbidden: 'no permitida',
+};
+function traducirSubEstado(code) {
+  return SUB_ESTADOS[code] || code;
+}
+// Experimental: traducción del estado de "mejor oferta" / Buy Box. Solo
+// aplica a publicaciones de catálogo; para el resto va a venir vacío.
+const PRECIO_A_GANAR = {
+  winning: { label: 'Ganando', clase: 'badge-activo' },
+  sharing_first_place: { label: 'Compartiendo 1er lugar', clase: 'badge-stock-bajo' },
+};
+function precioEstadoInfo(status) {
+  return PRECIO_A_GANAR[status] || { label: status, clase: 'badge-stock-bajo' };
+}
 %>
 <%- include('partials/head', { title: 'Publicaciones - SymL', active: 'publicaciones' }) %>
 
@@ -20,7 +57,10 @@ function linkOrden(campo, label) {
     % que cargaste en <a href="/configuracion">Configuración</a>. Conviene ir ajustando
     estos valores con tus ventas reales cada tanto. El ícono ⚠ al lado del nombre indica
     que MercadoLibre considera que esa publicación podría mejorarse (completar más datos,
-    fotos, etc.) — es un indicador de ellos, no algo que calculemos nosotros.
+    fotos, etc.) — es un indicador de ellos, no algo que calculemos nosotros. La columna
+    "Precio vs. competencia" es experimental y solo va a traer datos en publicaciones de
+    catálogo (donde varios vendedores compiten por la misma ficha) — en el resto va a
+    quedar vacía, y es normal.
   </p>
 
   <form method="GET" action="/publicaciones" class="filtros-form">
@@ -31,6 +71,7 @@ function linkOrden(campo, label) {
       <a href="/publicaciones?estado=todas&costo=<%= costoFiltro %>&stock=<%= stockFiltro %>&q=<%= encodeURIComponent(q) %>&sort=<%= sort %>&dir=<%= dir %>" class="<%= filtro === 'todas' ? 'active' : '' %>">Todas</a>
       <a href="/publicaciones?estado=activas&costo=<%= costoFiltro %>&stock=<%= stockFiltro %>&q=<%= encodeURIComponent(q) %>&sort=<%= sort %>&dir=<%= dir %>" class="<%= filtro === 'activas' ? 'active' : '' %>">Activas</a>
       <a href="/publicaciones?estado=pausadas&costo=<%= costoFiltro %>&stock=<%= stockFiltro %>&q=<%= encodeURIComponent(q) %>&sort=<%= sort %>&dir=<%= dir %>" class="<%= filtro === 'pausadas' ? 'active' : '' %>">Pausadas</a>
+      <a href="/publicaciones?estado=inactivas&costo=<%= costoFiltro %>&stock=<%= stockFiltro %>&q=<%= encodeURIComponent(q) %>&sort=<%= sort %>&dir=<%= dir %>" class="<%= filtro === 'inactivas' ? 'active' : '' %>">Inactivas / en revisión</a>
     </div>
 
     <input type="hidden" name="estado" value="<%= filtro %>" />
@@ -64,6 +105,7 @@ function linkOrden(campo, label) {
         <th>Impuestos</th>
         <th><%- linkOrden('margen', 'Margen neto') %></th>
         <th><%- linkOrden('stock', 'Stock') %></th>
+        <th title="Experimental: solo aplica a publicaciones de catálogo">Precio vs. competencia</th>
         <th>Tipo</th>
         <th>Acciones</th>
       </tr>
@@ -82,15 +124,24 @@ function linkOrden(campo, label) {
             <% } %>
           </td>
           <td>
-            <span class="badge <%= it.estado === 'active' ? 'badge-activo' : 'badge-pausado' %>">
-              <%= it.estado === 'active' ? 'Activa' : 'Pausada' %>
+            <span class="badge <%= estadoInfo(it.estado).clase %>">
+              <%= estadoInfo(it.estado).label %>
             </span>
-            <form method="POST" action="/productos/<%= it.id %>/estado" class="inline-form">
-              <input type="hidden" name="estado" value="<%= it.estado === 'active' ? 'paused' : 'active' %>" />
-              <button type="submit" class="link-btn">
-                <%= it.estado === 'active' ? 'Pausar' : 'Activar' %>
-              </button>
-            </form>
+            <% if (it.subEstado && it.subEstado.length > 0) { %>
+              <div class="muted" style="margin-top: 2px;">
+                <%= it.subEstado.map(traducirSubEstado).join(', ') %>
+              </div>
+            <% } %>
+            <% if (it.estado === 'active' || it.estado === 'paused') { %>
+              <form method="POST" action="/productos/<%= it.id %>/estado" class="inline-form">
+                <input type="hidden" name="estado" value="<%= it.estado === 'active' ? 'paused' : 'active' %>" />
+                <button type="submit" class="link-btn">
+                  <%= it.estado === 'active' ? 'Pausar' : 'Activar' %>
+                </button>
+              </form>
+            <% } else { %>
+              <div class="muted" style="margin-top: 4px;">Resolvé esto desde MercadoLibre</div>
+            <% } %>
           </td>
           <td>$<%= it.precio %></td>
           <td>
@@ -141,6 +192,18 @@ function linkOrden(campo, label) {
             </form>
           </td>
           <td>
+            <% if (it.precioAGanar) { %>
+              <span class="badge <%= precioEstadoInfo(it.precioAGanar.status).clase %>">
+                <%= precioEstadoInfo(it.precioAGanar.status).label %>
+              </span>
+              <% if (it.precioAGanar.precioParaGanar != null) { %>
+                <div class="muted" style="margin-top: 2px;">Para ganar: $<%= it.precioAGanar.precioParaGanar %></div>
+              <% } %>
+            <% } else { %>
+              <span class="muted">—</span>
+            <% } %>
+          </td>
+          <td>
             <span class="badge <%= it.tipo === 'drop' ? 'badge-drop' : 'badge-activo' %>">
               <%= it.tipo === 'drop' ? 'Drop' : 'Propio' %>
             </span>
@@ -159,7 +222,7 @@ function linkOrden(campo, label) {
         </tr>
       <% }) %>
       <% if (items.length === 0) { %>
-        <tr><td colspan="11" class="muted">No hay publicaciones que coincidan con los filtros.</td></tr>
+        <tr><td colspan="12" class="muted">No hay publicaciones que coincidan con los filtros.</td></tr>
       <% } %>
     </tbody>
   </table>

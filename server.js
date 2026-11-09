@@ -160,6 +160,7 @@ app.get('/publicaciones', requireLogin, requireMlConnected, async (req, res) => 
     let filtrados = items.filter((it) => {
       if (filtro === 'activas' && it.estado !== 'active') return false;
       if (filtro === 'pausadas' && it.estado !== 'paused') return false;
+      if (filtro === 'inactivas' && (it.estado === 'active' || it.estado === 'paused')) return false;
       if (costoFiltro === 'sin' && it.costo != null) return false;
       if (stockFiltro === 'bajo' && it.stock > STOCK_BAJO_UMBRAL) return false;
       if (q && !it.titulo.toLowerCase().includes(q)) return false;
@@ -370,7 +371,8 @@ app.post('/preguntas/:id/responder', requireLogin, requireMlConnected, async (re
 app.get('/reputacion', requireLogin, requireMlConnected, async (req, res) => {
   try {
     const rep = await ml.getReputation(req.mlUserId);
-    res.render('reputacion', { rep });
+    const reclamos = await ml.getReclamos(req.mlUserId);
+    res.render('reputacion', { rep, reclamos });
   } catch (err) {
     console.error(err);
     res.status(500).send('Error consultando reputación: ' + err.message);

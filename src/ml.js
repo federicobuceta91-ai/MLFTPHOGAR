@@ -169,6 +169,27 @@ async function getEnvioCost(item) {
   }
 }
 
+// Sugerencia de precio / "mejor oferta" (Buy Box). Esto solo aplica a
+// publicaciones que participan de una ficha de catálogo compartida con otros
+// vendedores — para el resto es normal y esperable que no haya datos.
+// EXPERIMENTAL: no se pudo confirmar en vivo el endpoint ni la forma exacta
+// de la respuesta durante el desarrollo.
+async function getPrecioAGanar(item) {
+  try {
+    const data = await mlFetch(`/items/${item.id}/price_to_win?channel=marketplace`);
+    if (!data || !data.status) return null;
+    return {
+      status: data.status,
+      precioParaGanar:
+        data.price_to_win && typeof data.price_to_win.amount === 'number'
+          ? data.price_to_win.amount
+          : null,
+    };
+  } catch (err) {
+    return null;
+  }
+}
+
 async function getConfig() {
   const { rows } = await pool.query('SELECT * FROM config WHERE id = 1');
   return rows[0] || { impuestos_pct: 0 };
@@ -239,9 +260,10 @@ async function getItemsWithCostos(userId) {
   const config = await getConfig();
   const impuestosPct = Number(config.impuestos_pct) || 0;
 
-  const [comisiones, envios] = await Promise.all([
+  const [comisiones, envios, preciosAGanar] = await Promise.all([
     Promise.all(items.map((it) => getComisionML(it))),
     Promise.all(items.map((it) => getEnvioCost(it))),
+    Promise.all(items.map((it) => getPrecioAGanar(it))),
   ]);
 
   return items.map((it, idx) => {
@@ -250,6 +272,7 @@ async function getItemsWithCostos(userId) {
     const precio = it.price;
     const comisionML = comisiones[idx];
     const envioCost = envios[idx];
+    const precioAGanar = preciosAGanar[idx];
     const impuestoMonto = (precio * impuestosPct) / 100;
     const margenBruto = costo != null ? precio - costo : null;
     const margen =
@@ -263,6 +286,7 @@ async function getItemsWithCostos(userId) {
       precio,
       stock: it.available_quantity,
       estado: it.status,
+      subEstado: Array.isArray(it.sub_status) ? it.sub_status : [],
       permalink: it.permalink,
       thumbnail: it.thumbnail,
       costo,
@@ -278,6 +302,7 @@ async function getItemsWithCostos(userId) {
       notas: costoRow ? costoRow.notas : null,
       tipo: costoRow ? costoRow.tipo : 'propio',
       proveedor: costoRow ? costoRow.proveedor : null,
+      precioAGanar,
     };
   });
 }
@@ -416,14 +441,53 @@ async function answerQuestion(questionId, text) {
   });
 }
 
+// Mapeo del "semáforo" de reputación de ML (color + posición 1-5) a partir de
+// level_id. Si ML cambia estos valores, conviene ajustarlo acá.
+const NIVELES_REPUTACION = {
+  '5_green': { posicion: 5, color: '#00a650', label: 'Verde' },
+  '4_light_green': { posicion: 4, color: '#8bc34a', label: 'Verde claro' },
+  '3_yellow': { posicion: 3, color: '#fff159', label: 'Amarillo' },
+  '2_orange': { posicion: 2, color: '#f2994a', label: 'Naranja' },
+  '1_red': { posicion: 1, color: '#f23d4f', label: 'Rojo' },
+};
+
+function getNivelReputacion(levelId) {
+  return NIVELES_REPUTACION[levelId] || { posicion: 0, color: '#ccc', label: 'Sin reputación (nuevo o sin ventas recientes)' };
+}
+
+// Reclamos / Posventa. EXPERIMENTAL: no se pudo confirmar en vivo el endpoint
+// exacto ni la forma de la respuesta durante el desarrollo (solo lo armamos
+// según la documentación). Si falla, devolvemos una lista vacía en vez de
+// romper toda la pantalla de Reputación.
+async function getReclamos(userId) {
+  try {
+    const data = await mlFetch(`/post-purchase/v1/claims/search?player_role=respondent&player_id=${userId}`);
+    const lista = Array.isArray(data) ? data : (data && Array.isArray(data.data) ? data.data : []);
+    return lista.map((c) => ({
+      id: c.id,
+      tipo: c.type || null,
+      etapa: c.stage || null,
+      estado: c.status || null,
+      recurso: c.resource_id || c.resource || null,
+      fecha: c.date_created || null,
+    }));
+  } catch (err) {
+    console.error('No se pudo obtener reclamos/posventa (experimental):', err.message);
+    return [];
+  }
+}
+
 async function getReputation(userId) {
   const data = await mlFetch(`/users/${userId}`);
+  const sr = data.seller_reputation || {};
+  const levelId = sr.level_id || null;
   return {
     nickname: data.nickname,
-    levelId: data.seller_reputation ? data.seller_reputation.level_id : null,
-    powerSellerStatus: data.seller_reputation ? data.seller_reputation.power_seller_status : null,
-    transactions: data.seller_reputation ? data.seller_reputation.transactions : {},
-    metrics: data.seller_reputation ? data.seller_reputation.metrics : {},
+    levelId,
+    nivel: getNivelReputacion(levelId),
+    powerSellerStatus: sr.power_seller_status || null,
+    transactions: sr.transactions || {},
+    metrics: sr.metrics || {},
   };
 }
 
@@ -450,4 +514,5 @@ module.exports = {
   getUnansweredQuestions,
   answerQuestion,
   getReputation,
+  getReclamos,
 };

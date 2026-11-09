@@ -2,11 +2,22 @@
 
   <h1>Reputación de <%= rep.nickname %></h1>
 
-  <div class="cards-grid">
-    <div class="card stat">
-      <div class="stat-label">Nivel</div>
-      <div class="stat-value"><%= rep.levelId || 'Sin datos aún' %></div>
+  <div class="card">
+    <p class="muted" style="margin-top: 0;">Así te ven tus compradores</p>
+    <p class="reputacion-label">
+      <span class="reputacion-dot" style="background: <%= rep.nivel.color %>;"></span>
+      <%= rep.nivel.label %>
+    </p>
+    <div class="reputacion-bar">
+      <div class="segmento <%= rep.nivel.posicion === 1 ? 'activo' : '' %>" style="background: #f23d4f;"></div>
+      <div class="segmento <%= rep.nivel.posicion === 2 ? 'activo' : '' %>" style="background: #f2994a;"></div>
+      <div class="segmento <%= rep.nivel.posicion === 3 ? 'activo' : '' %>" style="background: #fff159;"></div>
+      <div class="segmento <%= rep.nivel.posicion === 4 ? 'activo' : '' %>" style="background: #8bc34a;"></div>
+      <div class="segmento <%= rep.nivel.posicion === 5 ? 'activo' : '' %>" style="background: #00a650;"></div>
     </div>
+  </div>
+
+  <div class="cards-grid" style="margin-top: 16px;">
     <div class="card stat">
       <div class="stat-label">MercadoLíder</div>
       <div class="stat-value"><%= rep.powerSellerStatus || '—' %></div>
@@ -31,7 +42,20 @@
         <%= rep.metrics && rep.metrics.cancellations ? (rep.metrics.cancellations.rate * 100).toFixed(1) + '%' : '—' %>
       </div>
     </div>
+    <div class="card stat">
+      <div class="stat-label">Envíos con demora</div>
+      <div class="stat-value">
+        <%= rep.metrics && rep.metrics.delayed_handling_time ? (rep.metrics.delayed_handling_time.rate * 100).toFixed(1) + '%' : '—' %>
+      </div>
+    </div>
   </div>
+
+  <p class="muted" style="margin-top: 16px;">
+    Nota: estos porcentajes vienen directo de la API de reputación de MercadoLibre
+    (igual que en tu panel de vendedor). No pudimos confirmar en vivo los nombres
+    exactos de cada métrica durante el desarrollo, así que si algún número no
+    coincide con lo que ves en ML, avisanos para ajustarlo.
+  </p>
 
   <% if (rep.transactions && rep.transactions.ratings) { %>
     <h2>Calificaciones</h2>
@@ -40,6 +64,40 @@
       <li>Neutras: <%= rep.transactions.ratings.neutral %></li>
       <li>Negativas: <%= rep.transactions.ratings.negative %></li>
     </ul>
+  <% } %>
+
+  <h2 style="margin-top: 28px;">Reclamos / Posventa <span class="badge badge-stock-bajo">Experimental</span></h2>
+  <p class="muted">
+    Esto es lo menos probado de todo lo que armamos hasta ahora: no pudimos confirmar
+    en vivo ni el endpoint ni la forma exacta de los datos durante el desarrollo. Si
+    ves algo raro acá (nada, datos incompletos, un error), avisanos — puede que
+    MercadoLibre use un formato distinto al que supusimos.
+  </p>
+  <% if (reclamos.length === 0) { %>
+    <p class="muted">No hay reclamos para mostrar (o todavía no pudimos confirmar cómo traerlos).</p>
+  <% } else { %>
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Tipo</th>
+          <th>Etapa</th>
+          <th>Estado</th>
+          <th>Recurso</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% reclamos.forEach(function(r) { %>
+          <tr>
+            <td class="muted"><%= r.fecha ? new Date(r.fecha).toLocaleString('es-AR') : '—' %></td>
+            <td><%= r.tipo || '—' %></td>
+            <td><%= r.etapa || '—' %></td>
+            <td><%= r.estado || '—' %></td>
+            <td><%= r.recurso || '—' %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
   <% } %>
 
 <%- include('partials/foot') %>
