@@ -3,12 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Ingresar - ML con More</title>
+  <title>Ingresar - SymL</title>
+  <link rel="icon" type="image/png" href="/favicon.png" />
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body class="login-body">
   <form method="POST" action="/login" class="login-card">
-    <h1>ML con More</h1>
+    <img src="/img/logo.png" alt="SymL" class="login-logo" />
+    <p class="muted" style="margin-top: -8px;">× FTP Hogar</p>
     <% if (error) { %>
       <p class="error"><%= error %></p>
     <% } %>
