@@ -73,7 +73,23 @@ body {
 .side-nav a.proximo { color: #777; }
 .side-nav a.proximo .nav-label::after { content: " · próx."; font-size: 10px; color: #666; }
 
+.side-usuario {
+  padding: 10px 20px 0;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  margin-top: 10px;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 13px;
+  color: #ccc;
+}
+.side-usuario .nav-icon { width: 20px; text-align: center; flex-shrink: 0; font-size: 15px; }
+.side-usuario .nav-label { opacity: 0; transition: opacity 0.1s; overflow: hidden; text-overflow: ellipsis; }
+.sidebar:hover .side-usuario .nav-label { opacity: 1; }
+
 .side-logout { padding: 10px 20px 0; border-top: 1px solid rgba(255,255,255,0.1); margin-top: 10px; white-space: nowrap; }
+.side-usuario + .side-logout { border-top: none; margin-top: 0; }
 .side-logout button {
   background: none;
   border: none;

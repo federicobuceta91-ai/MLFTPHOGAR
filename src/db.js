@@ -84,6 +84,20 @@ async function migrate() {
       UNIQUE (ml_item_id, tipo)
     );
   `);
+
+  // Usuarios de la app (reemplaza el usuario/clave único compartido que vivía
+  // en las Environment Variables de Render). Por ahora todos los usuarios
+  // tienen el mismo nivel de acceso — no hay roles distintos todavía.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS usuarios (
+      id SERIAL PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL,
+      nombre TEXT,
+      clave_hash TEXT NOT NULL,
+      activo BOOLEAN NOT NULL DEFAULT true,
+      creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
 }
 
 module.exports = { pool, migrate };

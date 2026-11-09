@@ -33,6 +33,11 @@
         <a href="/comparativa" class="<%= (typeof active !== 'undefined' && active === 'comparativa') ? 'active' : '' %>"><span class="nav-icon">⚖️</span><span class="nav-label">Comparativa</span></a>
         <a href="/configuracion" class="<%= (typeof active !== 'undefined' && active === 'configuracion') ? 'active' : '' %>"><span class="nav-icon">⚙️</span><span class="nav-label">Configuración</span></a>
       </nav>
+      <% if (typeof usuarioActual !== 'undefined' && usuarioActual) { %>
+        <div class="side-usuario">
+          <span class="nav-icon">👤</span><span class="nav-label muted"><%= usuarioActual %></span>
+        </div>
+      <% } %>
       <form method="POST" action="/logout" class="side-logout">
         <button type="submit"><span class="nav-icon">🚪</span><span class="nav-label">Cerrar sesión</span></button>
       </form>

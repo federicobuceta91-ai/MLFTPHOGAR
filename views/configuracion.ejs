@@ -63,4 +63,88 @@
     </form>
   </div>
 
+  <div class="card" style="max-width: 640px; margin-top: 24px;">
+    <h2 style="font-size: 16px; margin-top: 0;">Usuarios</h2>
+    <p class="muted">
+      Cada persona entra con su propio usuario y clave — ya no se comparte un solo
+      login. Por ahora todos los usuarios tienen el mismo nivel de acceso (no hay
+      roles ni permisos diferenciados todavía).
+    </p>
+
+    <% if (usuarioCreado) { %>
+      <p class="muted" style="color: var(--verde); font-weight: 700;">Guardado ✔</p>
+    <% } %>
+    <% if (usuarioError) { %>
+      <p class="error"><%= usuarioError %></p>
+    <% } %>
+
+    <div class="tabla-wrap">
+      <table class="tabla">
+        <thead>
+          <tr>
+            <th>Email / usuario</th>
+            <th>Nombre</th>
+            <th>Estado</th>
+            <th>Creado</th>
+            <th>Cambiar clave</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <% usuarios.forEach(function (u) { %>
+            <tr>
+              <td>
+                <%= u.email %>
+                <% if (String(u.id) === String(usuarioActualId)) { %>
+                  <span class="muted">(vos)</span>
+                <% } %>
+              </td>
+              <td><%= u.nombre || '—' %></td>
+              <td>
+                <span class="badge <%= u.activo ? 'badge-activo' : 'badge-pausado' %>">
+                  <%= u.activo ? 'Activo' : 'Desactivado' %>
+                </span>
+              </td>
+              <td class="muted"><%= new Date(u.creado_en).toLocaleDateString('es-AR') %></td>
+              <td>
+                <form method="POST" action="/configuracion/usuarios/<%= u.id %>/clave" style="display: flex; gap: 6px;">
+                  <input type="password" name="clave" placeholder="clave nueva" style="width: 110px;" required />
+                  <input type="password" name="clave2" placeholder="repetir" style="width: 100px;" required />
+                  <button type="submit" class="link-btn">Cambiar</button>
+                </form>
+              </td>
+              <td>
+                <form method="POST" action="/configuracion/usuarios/<%= u.id %>/activo">
+                  <input type="hidden" name="activo" value="<%= u.activo ? '0' : '1' %>" />
+                  <button type="submit" class="link-btn">
+                    <%= u.activo ? 'Desactivar' : 'Activar' %>
+                  </button>
+                </form>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 style="font-size: 14px; margin-top: 20px;">Crear usuario nuevo</h3>
+    <form method="POST" action="/configuracion/usuarios">
+      <label for="usuarioEmail">Email o usuario</label>
+      <input type="text" id="usuarioEmail" name="email" placeholder="ej: morena@gmail.com" required />
+      <label for="usuarioNombre" style="margin-top: 10px;">Nombre (opcional, para identificarla en la lista)</label>
+      <input type="text" id="usuarioNombre" name="nombre" placeholder="ej: Morena" />
+      <div style="display: flex; gap: 10px; margin-top: 10px;">
+        <div style="flex: 1;">
+          <label for="usuarioClave">Clave</label>
+          <input type="password" id="usuarioClave" name="clave" required />
+        </div>
+        <div style="flex: 1;">
+          <label for="usuarioClave2">Repetir clave</label>
+          <input type="password" id="usuarioClave2" name="clave2" required />
+        </div>
+      </div>
+      <button type="submit" style="margin-top: 16px;">Crear usuario</button>
+    </form>
+  </div>
+
 <%- include('partials/foot') %>

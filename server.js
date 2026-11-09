@@ -24,6 +24,14 @@ app.use(
   })
 );
 
+// Deja el nombre/email del usuario logueado disponible para cualquier vista
+// (lo usa el sidebar para mostrar quién está adentro), sin tener que pasarlo
+// a mano en cada res.render.
+app.use((req, res, next) => {
+  res.locals.usuarioActual = req.session.usuarioNombre || req.session.usuarioEmail || null;
+  next();
+});
+
 function requireLogin(req, res, next) {
   if (req.session.loggedIn) return next();
   return res.redirect('/login');
@@ -47,10 +55,14 @@ app.get('/login', (req, res) => {
   res.render('login', { error: null });
 });
 
-app.post('/login', (req, res) => {
+app.post('/login', async (req, res) => {
   const { usuario, clave } = req.body;
-  if (usuario === process.env.APP_LOGIN_USER && clave === process.env.APP_LOGIN_PASS) {
+  const usuarioEncontrado = await ml.verificarLogin((usuario || '').trim(), clave || '');
+  if (usuarioEncontrado) {
     req.session.loggedIn = true;
+    req.session.usuarioId = usuarioEncontrado.id;
+    req.session.usuarioEmail = usuarioEncontrado.email;
+    req.session.usuarioNombre = usuarioEncontrado.nombre;
     return res.redirect('/');
   }
   res.render('login', { error: 'Usuario o clave incorrectos' });
@@ -383,12 +395,17 @@ app.get('/calculadora', requireLogin, async (req, res) => {
 app.get('/configuracion', requireLogin, async (req, res) => {
   const config = await ml.getConfig();
   const spl = await ml.getSplCredenciales();
+  const usuarios = await ml.getUsuarios();
   res.render('configuracion', {
     config,
     spl,
+    usuarios,
+    usuarioActualId: req.session.usuarioId || null,
     guardado: req.query.guardado === '1',
     splGuardado: req.query.splGuardado === '1',
     splError: req.query.splError || null,
+    usuarioCreado: req.query.usuarioCreado === '1',
+    usuarioError: req.query.usuarioError || null,
   });
 });
 
@@ -408,6 +425,67 @@ app.post('/configuracion/spl-login', requireLogin, async (req, res) => {
   }
   await ml.setSplCredenciales(usuario.trim(), clave || null);
   res.redirect('/configuracion?splGuardado=1');
+});
+
+// ---------- Usuarios de la app ----------
+// Reemplaza el usuario/clave único compartido que vivía en las Environment
+// Variables de Render: desde acá se crea un usuario por persona. Por ahora
+// todos tienen el mismo nivel de acceso completo (sin roles diferenciados).
+
+function redirectConErrorUsuario(res, mensaje) {
+  res.redirect('/configuracion?usuarioError=' + encodeURIComponent(mensaje));
+}
+
+app.post('/configuracion/usuarios', requireLogin, async (req, res) => {
+  const { email, nombre, clave, clave2 } = req.body;
+  if (!email || !email.trim()) {
+    return redirectConErrorUsuario(res, 'Ingresá un email o usuario para la nueva persona.');
+  }
+  if (!clave) {
+    return redirectConErrorUsuario(res, 'Ingresá una clave para la nueva persona.');
+  }
+  if (clave !== clave2) {
+    return redirectConErrorUsuario(res, 'Las claves no coinciden.');
+  }
+  try {
+    await ml.crearUsuario(email.trim(), (nombre || '').trim(), clave);
+    res.redirect('/configuracion?usuarioCreado=1');
+  } catch (err) {
+    console.error(err);
+    if (err.code === '23505') {
+      // Violación de la restricción UNIQUE(email).
+      return redirectConErrorUsuario(res, 'Ya existe un usuario con ese email.');
+    }
+    redirectConErrorUsuario(res, 'No se pudo crear el usuario: ' + err.message);
+  }
+});
+
+app.post('/configuracion/usuarios/:id/clave', requireLogin, async (req, res) => {
+  const { clave, clave2 } = req.body;
+  if (!clave) {
+    return redirectConErrorUsuario(res, 'Ingresá la clave nueva.');
+  }
+  if (clave !== clave2) {
+    return redirectConErrorUsuario(res, 'Las claves no coinciden.');
+  }
+  await ml.cambiarClaveUsuario(req.params.id, clave);
+  res.redirect('/configuracion?usuarioCreado=1');
+});
+
+app.post('/configuracion/usuarios/:id/activo', requireLogin, async (req, res) => {
+  const activo = req.body.activo === '1';
+  const esUsuarioActual = String(req.session.usuarioId) === req.params.id;
+  if (!activo) {
+    if (esUsuarioActual) {
+      return redirectConErrorUsuario(res, 'No podés desactivar tu propio usuario mientras estás adentro.');
+    }
+    const activos = await ml.contarUsuariosActivos();
+    if (activos <= 1) {
+      return redirectConErrorUsuario(res, 'No se puede desactivar: es el único usuario activo, nadie podría volver a entrar.');
+    }
+  }
+  await ml.setUsuarioActivo(req.params.id, activo);
+  res.redirect('/configuracion');
 });
 
 // ---------- Preguntas ----------
@@ -554,6 +632,7 @@ app.post('/agente/descartes/:id/reactivar', requireLogin, async (req, res) => {
 // ---------- Arranque ----------
 
 migrate()
+  .then(() => ml.bootstrapUsuarioInicial())
   .then(() => {
     app.listen(port, '0.0.0.0', () => {
       console.log(`ML con More corriendo en 0.0.0.0:${port}`);

@@ -267,6 +267,75 @@ async function verificarSplLogin(usuario, clave) {
   return verifyPassword(clave, config.spl_clave_hash);
 }
 
+// ---------- Usuarios de la app (Configuración → Usuarios) ----------
+// Reemplaza el usuario/clave único compartido que vivía en las Environment
+// Variables de Render. Por ahora todos los usuarios tienen el mismo nivel de
+// acceso — no hay roles/permisos distintos todavía (se puede sumar más
+// adelante si hace falta).
+
+// Si todavía no se creó ningún usuario y existen las variables de entorno del
+// login viejo (APP_LOGIN_USER / APP_LOGIN_PASS), se crea un usuario inicial a
+// partir de ellas la primera vez que arranca el server con esta versión —
+// así nadie queda afuera de su propia app el día del deploy. Una vez adentro,
+// desde Configuración se puede crear el usuario "de verdad" (con el email
+// real) y, si se quiere, desactivar este usuario inicial.
+async function bootstrapUsuarioInicial() {
+  const { rows } = await pool.query('SELECT COUNT(*)::int AS total FROM usuarios');
+  if (rows[0].total > 0) return;
+  const usuarioViejo = process.env.APP_LOGIN_USER;
+  const claveVieja = process.env.APP_LOGIN_PASS;
+  if (!usuarioViejo || !claveVieja) return;
+  const claveHash = hashPassword(claveVieja);
+  await pool.query(
+    `INSERT INTO usuarios (email, nombre, clave_hash) VALUES ($1, $2, $3)
+     ON CONFLICT (email) DO NOTHING`,
+    [usuarioViejo, usuarioViejo, claveHash]
+  );
+}
+
+async function getUsuarios() {
+  const { rows } = await pool.query(
+    'SELECT id, email, nombre, activo, creado_en FROM usuarios ORDER BY creado_en ASC'
+  );
+  return rows;
+}
+
+async function crearUsuario(email, nombre, clave) {
+  const claveHash = hashPassword(clave);
+  await pool.query(
+    `INSERT INTO usuarios (email, nombre, clave_hash) VALUES ($1, $2, $3)`,
+    [email, nombre || null, claveHash]
+  );
+}
+
+async function cambiarClaveUsuario(id, claveNueva) {
+  const claveHash = hashPassword(claveNueva);
+  await pool.query('UPDATE usuarios SET clave_hash = $1 WHERE id = $2', [claveHash, id]);
+}
+
+async function setUsuarioActivo(id, activo) {
+  await pool.query('UPDATE usuarios SET activo = $1 WHERE id = $2', [activo, id]);
+}
+
+// Cuántos usuarios activos hay, para no permitir desactivar al último (nadie
+// podría volver a entrar a la app).
+async function contarUsuariosActivos() {
+  const { rows } = await pool.query('SELECT COUNT(*)::int AS total FROM usuarios WHERE activo = true');
+  return rows[0].total;
+}
+
+async function verificarLogin(email, clave) {
+  const { rows } = await pool.query(
+    'SELECT * FROM usuarios WHERE email = $1 AND activo = true',
+    [email]
+  );
+  const usuario = rows[0];
+  if (!usuario) return null;
+  const ok = verifyPassword(clave, usuario.clave_hash);
+  if (!ok) return null;
+  return { id: usuario.id, email: usuario.email, nombre: usuario.nombre };
+}
+
 async function getItemsWithCostos(userId) {
   const ids = await getAllItemIds(userId);
   const items = await getItemsDetails(ids);
@@ -1001,4 +1070,11 @@ module.exports = {
   descartarPropuesta,
   getDescartesDetalle,
   reactivarDescarte,
+  bootstrapUsuarioInicial,
+  getUsuarios,
+  crearUsuario,
+  cambiarClaveUsuario,
+  setUsuarioActivo,
+  contarUsuariosActivos,
+  verificarLogin,
 };
