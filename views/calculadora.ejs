@@ -35,6 +35,30 @@
       revisala en el simulador de MercadoLibre o en una publicación parecida a la tuya
       si no la sabés de memoria.
     </p>
+
+    <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--borde);">
+      <label for="calcLogistica">Costo fijo por unidad vendida (productos menores a $33.000)</label>
+      <select id="calcLogistica">
+        <option value="flex">Envíos Flex / acuerdo con el comprador / retiro en domicilio (se calcula solo, por tramo de precio)</option>
+        <option value="full">Envíos Full / correo / colecta / puntos de despacho (varía según peso y medidas — cargalo vos)</option>
+      </select>
+      <div id="calcFijoManualWrap" style="display: none; margin-top: 10px;">
+        <label for="calcFijoManual">Costo fijo por unidad vendida ($)</label>
+        <input type="number" step="0.01" min="0" id="calcFijoManual" value="0" />
+      </div>
+      <p class="muted" style="margin-top: 10px;">
+        Desde noviembre de 2026, en productos de menos de $33.000 MercadoLibre cobra,
+        además de la comisión de arriba, un costo fijo por cada unidad vendida: con
+        Envíos Flex/acuerdo/retiro es un monto fijo según el precio ($1.330 hasta
+        $14.999 · $2.740 de $15.000 a $23.999 · $3.320 de $24.000 a $32.999 · no se
+        cobra desde $33.000); con Full/correo/colecta/puntos de despacho se calcula
+        según el peso y las medidas del producto, así que ese número lo tenés que
+        cargar vos (lo ves en el simulador de costos de MercadoLibre). Si vendés kits,
+        este costo se cobra una sola vez por kit, no por unidad adentro del kit. Estos
+        montos los puede cambiar MercadoLibre en cualquier momento — si ves que no
+        coinciden con lo que te cobran de verdad, avisanos para actualizarlos.
+      </p>
+    </div>
   </div>
 
   <div class="cards-grid" style="margin-top: 16px;">
@@ -74,11 +98,54 @@
     return signo + '$' + Math.abs(n).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
+  // Costo fijo por unidad vendida que cobra MercadoLibre además de la comisión,
+  // solo en productos de menos de $33.000 (ver nota en la página, fuente:
+  // vendedores.mercadolibre.com.ar/landing/costos-de-venta, vigente a noviembre
+  // de 2026). Con Envíos Flex/acuerdo/retiro es un monto fijo por tramo de
+  // precio; con Full/correo/colecta depende del peso y las medidas del
+  // producto, así que ahí lo carga el usuario a mano.
+  var TRAMOS_FIJO_FLEX = [
+    { min: 0, max: 14999, fijo: 1330 },
+    { min: 15000, max: 23999, fijo: 2740 },
+    { min: 24000, max: 32999, fijo: 3320 },
+    { min: 33000, max: Infinity, fijo: 0 },
+  ];
+
+  function costoFijoFlexPorPrecio(precio) {
+    for (var i = 0; i < TRAMOS_FIJO_FLEX.length; i++) {
+      var t = TRAMOS_FIJO_FLEX[i];
+      if (precio >= t.min && precio <= t.max) return t.fijo;
+    }
+    return 0;
+  }
+
+  // Para "margen objetivo -> precio" con Flex, el costo fijo depende del
+  // precio que todavía no conocemos (depende del tramo en el que caiga). Como
+  // los tramos son pocos y están ordenados, probamos cada uno asumiendo su
+  // costo fijo y nos quedamos con el primero que da un precio consistente con
+  // ese mismo tramo.
+  function precioConFijoFlex(costo, comisionPct, envio, impuestosPct, margenObjetivoPct, divisor) {
+    var objetivo = costo * (margenObjetivoPct / 100);
+    for (var i = 0; i < TRAMOS_FIJO_FLEX.length; i++) {
+      var t = TRAMOS_FIJO_FLEX[i];
+      var candidato = (objetivo + costo + envio + t.fijo) / divisor;
+      if (candidato >= t.min && candidato <= t.max) {
+        return { precio: candidato, fijo: t.fijo };
+      }
+    }
+    // No debería pasar, pero por las dudas: sin cargo fijo.
+    return { precio: (objetivo + costo + envio) / divisor, fijo: 0 };
+  }
+
   function recalcular() {
     var costo = num('calcCosto');
     var comisionPct = num('calcComision') || 0;
     var envio = num('calcEnvio') || 0;
     var impuestosPct = num('calcImpuestos') || 0;
+    var logistica = document.getElementById('calcLogistica').value;
+    var fijoManual = num('calcFijoManual') || 0;
+
+    document.getElementById('calcFijoManualWrap').style.display = logistica === 'full' ? '' : 'none';
 
     // Opción 1: a partir de un precio de venta, calcula el margen neto.
     var precio = num('calcPrecio');
@@ -87,12 +154,14 @@
     if (costo != null && precio != null) {
       var comisionMonto = (precio * comisionPct) / 100;
       var impuestoMonto = (precio * impuestosPct) / 100;
-      var margen = precio - costo - comisionMonto - envio - impuestoMonto;
+      var costoFijo = logistica === 'flex' ? costoFijoFlexPorPrecio(precio) : fijoManual;
+      var margen = precio - costo - comisionMonto - envio - impuestoMonto - costoFijo;
       var margenPct = costo > 0 ? (margen / costo) * 100 : null;
       resMargen.textContent = fmt(margen);
       resMargen.style.color = margen < 0 ? 'var(--rojo)' : 'var(--verde)';
       resMargenDetalle.textContent =
         'Comisión estimada: ' + fmt(comisionMonto) + ' · Impuesto: ' + fmt(impuestoMonto) +
+        ' · Costo fijo por venta: ' + fmt(costoFijo) +
         (margenPct != null ? ' · Margen: ' + margenPct.toFixed(1) + '% sobre el costo' : '');
     } else {
       resMargen.textContent = '—';
@@ -109,13 +178,15 @@
     if (costo != null && margenObjetivoPct != null) {
       var divisor = 1 - comisionPct / 100 - impuestosPct / 100;
       if (divisor > 0) {
-        var objetivo = costo * (margenObjetivoPct / 100);
-        var precioSugerido = (objetivo + costo + envio) / divisor;
-        resPrecio.textContent = fmt(precioSugerido);
+        var resultado =
+          logistica === 'flex'
+            ? precioConFijoFlex(costo, comisionPct, envio, impuestosPct, margenObjetivoPct, divisor)
+            : { precio: (costo * (margenObjetivoPct / 100) + costo + envio + fijoManual) / divisor, fijo: fijoManual };
+        resPrecio.textContent = fmt(resultado.precio);
         resPrecio.style.color = '';
         resPrecioDetalle.textContent =
-          'Con ' + comisionPct + '% de comisión y ' + impuestosPct + '% de impuestos, ese precio te deja ' +
-          margenObjetivoPct + '% de margen sobre el costo.';
+          'Con ' + comisionPct + '% de comisión, ' + impuestosPct + '% de impuestos y ' + fmt(resultado.fijo) +
+          ' de costo fijo por venta, ese precio te deja ' + margenObjetivoPct + '% de margen sobre el costo.';
       } else {
         resPrecio.textContent = '—';
         resPrecioDetalle.textContent = 'La comisión más los impuestos suman 100% o más: no hay precio posible.';
@@ -126,9 +197,10 @@
     }
   }
 
-  ['calcCosto', 'calcComision', 'calcEnvio', 'calcImpuestos', 'calcPrecio', 'calcMargenObjetivo'].forEach(function (id) {
+  ['calcCosto', 'calcComision', 'calcEnvio', 'calcImpuestos', 'calcPrecio', 'calcMargenObjetivo', 'calcFijoManual'].forEach(function (id) {
     document.getElementById(id).addEventListener('input', recalcular);
   });
+  document.getElementById('calcLogistica').addEventListener('change', recalcular);
   recalcular();
 })();
 </script>
