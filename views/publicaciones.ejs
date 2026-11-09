@@ -1,30 +1,66 @@
+<%
+// Arma el link de una cabecera ordenable, preservando el resto de los filtros activos.
+function linkOrden(campo, label) {
+  const nuevaDir = (sort === campo && dir === 'asc') ? 'desc' : 'asc';
+  const params = new URLSearchParams({
+    estado: filtro, costo: costoFiltro, stock: stockFiltro, q, sort: campo, dir: nuevaDir
+  });
+  const flecha = sort === campo ? (dir === 'asc' ? ' ▲' : ' ▼') : '';
+  return `<a href="/publicaciones?${params.toString()}" class="th-link">${label}${flecha}</a>`;
+}
+%>
 <%- include('partials/head', { title: 'Publicaciones - SymL', active: 'publicaciones' }) %>
 
   <h1>Publicaciones (<%= total %>)</h1>
   <p class="muted">
     Comisión y envío son estimados por MercadoLibre antes de la venta. Impuestos es el
     % que cargaste en <a href="/configuracion">Configuración</a>. Conviene ir ajustando
-    estos valores con tus ventas reales cada tanto.
+    estos valores con tus ventas reales cada tanto. El ícono ⚠ al lado del nombre indica
+    que MercadoLibre considera que esa publicación podría mejorarse (completar más datos,
+    fotos, etc.) — es un indicador de ellos, no algo que calculemos nosotros.
   </p>
 
-  <div class="tabs">
-    <a href="/publicaciones?estado=todas" class="<%= filtro === 'todas' ? 'active' : '' %>">Todas</a>
-    <a href="/publicaciones?estado=activas" class="<%= filtro === 'activas' ? 'active' : '' %>">Activas</a>
-    <a href="/publicaciones?estado=pausadas" class="<%= filtro === 'pausadas' ? 'active' : '' %>">Pausadas</a>
-  </div>
+  <form method="GET" action="/publicaciones" class="filtros-form">
+    <input type="hidden" name="sort" value="<%= sort %>" />
+    <input type="hidden" name="dir" value="<%= dir %>" />
+
+    <div class="tabs">
+      <a href="/publicaciones?estado=todas&costo=<%= costoFiltro %>&stock=<%= stockFiltro %>&q=<%= encodeURIComponent(q) %>&sort=<%= sort %>&dir=<%= dir %>" class="<%= filtro === 'todas' ? 'active' : '' %>">Todas</a>
+      <a href="/publicaciones?estado=activas&costo=<%= costoFiltro %>&stock=<%= stockFiltro %>&q=<%= encodeURIComponent(q) %>&sort=<%= sort %>&dir=<%= dir %>" class="<%= filtro === 'activas' ? 'active' : '' %>">Activas</a>
+      <a href="/publicaciones?estado=pausadas&costo=<%= costoFiltro %>&stock=<%= stockFiltro %>&q=<%= encodeURIComponent(q) %>&sort=<%= sort %>&dir=<%= dir %>" class="<%= filtro === 'pausadas' ? 'active' : '' %>">Pausadas</a>
+    </div>
+
+    <input type="hidden" name="estado" value="<%= filtro %>" />
+
+    <div class="filtros-row">
+      <input type="text" name="q" value="<%= q %>" placeholder="Buscar por nombre..." class="input-busqueda" />
+
+      <label class="check-label">
+        <input type="checkbox" name="costo" value="sin" onchange="this.form.submit()" <%= costoFiltro === 'sin' ? 'checked' : '' %> />
+        Sin costo cargado
+      </label>
+
+      <label class="check-label">
+        <input type="checkbox" name="stock" value="bajo" onchange="this.form.submit()" <%= stockFiltro === 'bajo' ? 'checked' : '' %> />
+        Stock bajo (≤ <%= stockBajoUmbral %>)
+      </label>
+
+      <button type="submit" class="link-btn">Buscar</button>
+    </div>
+  </form>
 
   <table class="tabla">
     <thead>
       <tr>
-        <th>Producto</th>
+        <th><%- linkOrden('titulo', 'Producto') %></th>
         <th>Estado</th>
-        <th>Precio</th>
+        <th><%- linkOrden('precio', 'Precio') %></th>
         <th>Costo</th>
         <th>Comisión ML</th>
         <th>Envío</th>
         <th>Impuestos</th>
-        <th>Margen neto</th>
-        <th>Stock</th>
+        <th><%- linkOrden('margen', 'Margen neto') %></th>
+        <th><%- linkOrden('stock', 'Stock') %></th>
         <th>Acciones</th>
       </tr>
     </thead>
@@ -34,6 +70,12 @@
           <td class="prod-cell">
             <img src="<%= it.thumbnail %>" alt="" class="thumb" />
             <a href="<%= it.permalink %>" target="_blank" rel="noopener"><%= it.titulo %></a>
+            <% if (it.health != null && it.health < 0.6) { %>
+              <span title="MercadoLibre sugiere mejorar esta publicación">⚠</span>
+            <% } %>
+            <% if (it.stock <= stockBajoUmbral) { %>
+              <span class="badge badge-stock-bajo">stock bajo</span>
+            <% } %>
           </td>
           <td>
             <span class="badge <%= it.estado === 'active' ? 'badge-activo' : 'badge-pausado' %>">
@@ -99,6 +141,9 @@
           </td>
         </tr>
       <% }) %>
+      <% if (items.length === 0) { %>
+        <tr><td colspan="10" class="muted">No hay publicaciones que coincidan con los filtros.</td></tr>
+      <% } %>
     </tbody>
   </table>
 

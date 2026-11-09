@@ -224,6 +224,7 @@ async function getItemsWithCostos(userId) {
       margenBruto,
       margen,
       margenPct,
+      health: typeof it.health === 'number' ? it.health : null,
       notas: costoRow ? costoRow.notas : null,
     };
   });

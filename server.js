@@ -111,16 +111,53 @@ app.get('/', requireLogin, requireMlConnected, async (req, res) => {
 
 // ---------- Publicaciones: rentabilidad y stock ----------
 
+const STOCK_BAJO_UMBRAL = 3; // a partir de este número (inclusive) se considera "stock bajo"
+
 app.get('/publicaciones', requireLogin, requireMlConnected, async (req, res) => {
   try {
     const items = await ml.getItemsWithCostos(req.mlUserId);
+
     const filtro = req.query.estado || 'todas';
-    const filtrados = items.filter((it) => {
-      if (filtro === 'activas') return it.estado === 'active';
-      if (filtro === 'pausadas') return it.estado === 'paused';
+    const costoFiltro = req.query.costo || 'todos';
+    const stockFiltro = req.query.stock || 'todos';
+    const q = (req.query.q || '').trim().toLowerCase();
+    const sort = req.query.sort || '';
+    const dir = req.query.dir === 'desc' ? 'desc' : 'asc';
+
+    let filtrados = items.filter((it) => {
+      if (filtro === 'activas' && it.estado !== 'active') return false;
+      if (filtro === 'pausadas' && it.estado !== 'paused') return false;
+      if (costoFiltro === 'sin' && it.costo != null) return false;
+      if (stockFiltro === 'bajo' && it.stock > STOCK_BAJO_UMBRAL) return false;
+      if (q && !it.titulo.toLowerCase().includes(q)) return false;
       return true;
     });
-    res.render('publicaciones', { items: filtrados, filtro, total: items.length });
+
+    const claves = { precio: 'precio', margen: 'margen', stock: 'stock', titulo: 'titulo' };
+    if (claves[sort]) {
+      const key = claves[sort];
+      filtrados = filtrados.slice().sort((a, b) => {
+        const va = a[key];
+        const vb = b[key];
+        if (va == null && vb == null) return 0;
+        if (va == null) return 1; // los que no tienen dato quedan al final
+        if (vb == null) return -1;
+        if (typeof va === 'string') return dir === 'desc' ? vb.localeCompare(va) : va.localeCompare(vb);
+        return dir === 'desc' ? vb - va : va - vb;
+      });
+    }
+
+    res.render('publicaciones', {
+      items: filtrados,
+      filtro,
+      costoFiltro,
+      stockFiltro,
+      q: req.query.q || '',
+      sort,
+      dir,
+      stockBajoUmbral: STOCK_BAJO_UMBRAL,
+      total: items.length,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).send('Error consultando MercadoLibre: ' + err.message);
