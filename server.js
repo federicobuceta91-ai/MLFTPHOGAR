@@ -66,9 +66,10 @@ app.get('/spl/login', (req, res) => {
   res.render('spl-login', { error: null });
 });
 
-app.post('/spl/login', (req, res) => {
+app.post('/spl/login', async (req, res) => {
   const { usuario, clave } = req.body;
-  if (usuario === process.env.SPL_LOGIN_USER && clave === process.env.SPL_LOGIN_PASS) {
+  const ok = await ml.verificarSplLogin(usuario, clave);
+  if (ok) {
     req.session.splLoggedIn = true;
     return res.redirect('/spl');
   }
@@ -296,13 +297,32 @@ app.post('/productos/:id/stock', requireLogin, requireMlConnected, async (req, r
 
 app.get('/configuracion', requireLogin, async (req, res) => {
   const config = await ml.getConfig();
-  res.render('configuracion', { config, guardado: req.query.guardado === '1' });
+  const spl = await ml.getSplCredenciales();
+  res.render('configuracion', {
+    config,
+    spl,
+    guardado: req.query.guardado === '1',
+    splGuardado: req.query.splGuardado === '1',
+    splError: req.query.splError || null,
+  });
 });
 
 app.post('/configuracion', requireLogin, async (req, res) => {
   const pct = Number(req.body.impuestos_pct) || 0;
   await ml.setConfig(pct);
   res.redirect('/configuracion?guardado=1');
+});
+
+app.post('/configuracion/spl-login', requireLogin, async (req, res) => {
+  const { usuario, clave, clave2 } = req.body;
+  if (!usuario || !usuario.trim()) {
+    return res.redirect('/configuracion?splError=' + encodeURIComponent('Ingresá un usuario.'));
+  }
+  if (clave && clave !== clave2) {
+    return res.redirect('/configuracion?splError=' + encodeURIComponent('Las claves no coinciden.'));
+  }
+  await ml.setSplCredenciales(usuario.trim(), clave || null);
+  res.redirect('/configuracion?splGuardado=1');
 });
 
 // ---------- Preguntas ----------

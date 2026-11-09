@@ -25,4 +25,42 @@
     porque pueden variar según el método de pago del comprador y otras condiciones.
   </p>
 
+  <div class="card" style="max-width: 420px; margin-top: 24px;">
+    <% if (splGuardado) { %>
+      <p class="muted" style="color: var(--verde); font-weight: 700;">Guardado ✔</p>
+    <% } %>
+    <% if (splError) { %>
+      <p class="error"><%= splError %></p>
+    <% } %>
+    <form method="POST" action="/configuracion/spl-login">
+      <label>Usuario para imprimir etiquetas (Panel SPL / depósito)</label>
+      <p class="muted">
+        Un usuario y clave aparte de tu login normal, para la persona que solo
+        necesita entrar a <a href="/spl" target="_blank" rel="noopener">/spl</a> a ver
+        los pedidos listos para facturar y bajar/imprimir el remito.
+        <% if (spl.configurado) { %>
+          Hoy está configurado con el usuario <strong><%= spl.usuario %></strong>.
+        <% } else { %>
+          Todavía no lo configuraste — el Panel SPL no va a dejar entrar a nadie hasta que lo hagas.
+        <% } %>
+      </p>
+      <input type="text" name="usuario" placeholder="usuario" value="<%= spl.usuario || '' %>" required />
+      <input
+        type="password"
+        name="clave"
+        placeholder="<%= spl.configurado ? 'nueva clave (dejar en blanco para no cambiarla)' : 'clave' %>"
+        <%= spl.configurado ? '' : 'required' %>
+        style="margin-top: 10px;"
+      />
+      <input
+        type="password"
+        name="clave2"
+        placeholder="repetir clave"
+        <%= spl.configurado ? '' : 'required' %>
+        style="margin-top: 10px;"
+      />
+      <button type="submit" style="margin-top: 16px;">Guardar</button>
+    </form>
+  </div>
+
 <%- include('partials/foot') %>

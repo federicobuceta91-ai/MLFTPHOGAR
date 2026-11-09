@@ -54,10 +54,16 @@ async function migrate() {
     CREATE TABLE IF NOT EXISTS config (
       id INTEGER PRIMARY KEY DEFAULT 1,
       impuestos_pct NUMERIC DEFAULT 0,
+      spl_usuario TEXT,
+      spl_clave_hash TEXT,
       updated_at TIMESTAMPTZ DEFAULT now(),
       CONSTRAINT single_row_config CHECK (id = 1)
     );
   `);
+
+  // Por si la tabla config ya existía de antes de que agregáramos el login del Panel SPL.
+  await pool.query(`ALTER TABLE config ADD COLUMN IF NOT EXISTS spl_usuario TEXT;`);
+  await pool.query(`ALTER TABLE config ADD COLUMN IF NOT EXISTS spl_clave_hash TEXT;`);
 
   await pool.query(`
     INSERT INTO config (id, impuestos_pct)

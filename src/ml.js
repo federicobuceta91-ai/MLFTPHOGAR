@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { pool } = require('./db');
 
 const API = 'https://api.mercadolibre.com';
@@ -179,6 +180,55 @@ async function setConfig(impuestosPct) {
      ON CONFLICT (id) DO UPDATE SET impuestos_pct = EXCLUDED.impuestos_pct, updated_at = now()`,
     [impuestosPct]
   );
+}
+
+// ---------- Usuario del Panel SPL (login del "depósito"), manejado desde Configuración ----------
+
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password, stored) {
+  if (!stored) return false;
+  const [salt, hash] = stored.split(':');
+  if (!salt || !hash) return false;
+  const hashBuffer = Buffer.from(hash, 'hex');
+  const testHash = crypto.scryptSync(password, salt, 64);
+  if (hashBuffer.length !== testHash.length) return false;
+  return crypto.timingSafeEqual(hashBuffer, testHash);
+}
+
+async function getSplCredenciales() {
+  const config = await getConfig();
+  return {
+    usuario: config.spl_usuario || null,
+    configurado: !!(config.spl_usuario && config.spl_clave_hash),
+  };
+}
+
+async function setSplCredenciales(usuario, clave) {
+  if (clave) {
+    const claveHash = hashPassword(clave);
+    await pool.query(
+      `UPDATE config SET spl_usuario = $1, spl_clave_hash = $2, updated_at = now() WHERE id = 1`,
+      [usuario, claveHash]
+    );
+  } else {
+    // Dejaron la clave en blanco: solo actualizamos el usuario, la clave queda igual.
+    await pool.query(
+      `UPDATE config SET spl_usuario = $1, updated_at = now() WHERE id = 1`,
+      [usuario]
+    );
+  }
+}
+
+async function verificarSplLogin(usuario, clave) {
+  const config = await getConfig();
+  if (!config.spl_usuario || !config.spl_clave_hash) return false;
+  if (usuario !== config.spl_usuario) return false;
+  return verifyPassword(clave, config.spl_clave_hash);
 }
 
 async function getItemsWithCostos(userId) {
@@ -385,6 +435,9 @@ module.exports = {
   getVentasYCMV,
   getConfig,
   setConfig,
+  getSplCredenciales,
+  setSplCredenciales,
+  verificarSplLogin,
   setCosto,
   setTipo,
   crearOrdenDrop,
