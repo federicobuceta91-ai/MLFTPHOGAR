@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ingresar - ML con More</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body class="login-body">
+  <form method="POST" action="/login" class="login-card">
+    <h1>ML con More</h1>
+    <% if (error) { %>
+      <p class="error"><%= error %></p>
+    <% } %>
+    <label>Usuario</label>
+    <input type="text" name="usuario" autocomplete="username" required />
+    <label>Clave</label>
+    <input type="password" name="clave" autocomplete="current-password" required />
+    <button type="submit">Ingresar</button>
+  </form>
+</body>
+</html>

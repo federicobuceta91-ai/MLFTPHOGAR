@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Rentabilidad y stock - ML con More</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <%- include('partials/nav') %>
+
+  <main class="container">
+    <h1>Publicaciones (<%= total %>)</h1>
+
+    <div class="tabs">
+      <a href="/?estado=todas" class="<%= filtro === 'todas' ? 'active' : '' %>">Todas</a>
+      <a href="/?estado=activas" class="<%= filtro === 'activas' ? 'active' : '' %>">Activas</a>
+      <a href="/?estado=pausadas" class="<%= filtro === 'pausadas' ? 'active' : '' %>">Pausadas</a>
+    </div>
+
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Estado</th>
+          <th>Precio</th>
+          <th>Costo</th>
+          <th>Margen</th>
+          <th>Stock</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% items.forEach(function(it) { %>
+          <tr>
+            <td class="prod-cell">
+              <img src="<%= it.thumbnail %>" alt="" class="thumb" />
+              <a href="<%= it.permalink %>" target="_blank" rel="noopener"><%= it.titulo %></a>
+            </td>
+            <td>
+              <span class="badge <%= it.estado === 'active' ? 'badge-activo' : 'badge-pausado' %>">
+                <%= it.estado === 'active' ? 'Activa' : 'Pausada' %>
+              </span>
+              <form method="POST" action="/productos/<%= it.id %>/estado" class="inline-form">
+                <input type="hidden" name="estado" value="<%= it.estado === 'active' ? 'paused' : 'active' %>" />
+                <button type="submit" class="link-btn">
+                  <%= it.estado === 'active' ? 'Pausar' : 'Activar' %>
+                </button>
+              </form>
+            </td>
+            <td>$<%= it.precio %></td>
+            <td>
+              <form method="POST" action="/productos/<%= it.id %>/costo" class="inline-form">
+                <input type="number" step="0.01" name="costo" value="<%= it.costo != null ? it.costo : '' %>" placeholder="costo" class="input-chico" />
+                <button type="submit" class="link-btn">Guardar</button>
+              </form>
+            </td>
+            <td>
+              <% if (it.margen != null) { %>
+                $<%= it.margen.toFixed(2) %>
+                <% if (it.margenPct != null) { %>
+                  <span class="muted">(<%= it.margenPct.toFixed(0) %>%)</span>
+                <% } %>
+              <% } else { %>
+                <span class="muted">cargá el costo</span>
+              <% } %>
+            </td>
+            <td>
+              <form method="POST" action="/productos/<%= it.id %>/stock" class="inline-form">
+                <input type="number" name="stock" value="<%= it.stock %>" class="input-chico" />
+                <button type="submit" class="link-btn">Guardar</button>
+              </form>
+            </td>
+            <td>
+              <a href="<%= it.permalink %>" target="_blank" rel="noopener" class="link-btn">Ver en ML</a>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </main>
+</body>
+</html>
