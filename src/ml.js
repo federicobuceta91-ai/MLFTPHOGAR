@@ -226,6 +226,8 @@ async function getItemsWithCostos(userId) {
       margenPct,
       health: typeof it.health === 'number' ? it.health : null,
       notas: costoRow ? costoRow.notas : null,
+      tipo: costoRow ? costoRow.tipo : 'propio',
+      proveedor: costoRow ? costoRow.proveedor : null,
     };
   });
 }
@@ -290,6 +292,51 @@ async function setCosto(itemId, costo, notas) {
   );
 }
 
+async function setTipo(itemId, tipo, proveedor) {
+  await pool.query(
+    `INSERT INTO productos (ml_item_id, tipo, proveedor, updated_at)
+     VALUES ($1, $2, $3, now())
+     ON CONFLICT (ml_item_id) DO UPDATE SET tipo = EXCLUDED.tipo, proveedor = EXCLUDED.proveedor, updated_at = now()`,
+    [itemId, tipo === 'drop' ? 'drop' : 'propio', tipo === 'drop' ? (proveedor || null) : null]
+  );
+}
+
+// ---------- Drop Shipping (prototipo con datos simulados, todavía sin Odoo real) ----------
+
+async function crearOrdenDrop({ itemId, titulo, proveedor, cantidad, comprador, direccionEnvio }) {
+  const { rows } = await pool.query(
+    `INSERT INTO ordenes_drop (ml_item_id, titulo, proveedor, cantidad, comprador, direccion_envio)
+     VALUES ($1, $2, $3, $4, $5, $6)
+     RETURNING *`,
+    [itemId, titulo, proveedor || null, cantidad || 1, comprador || null, direccionEnvio || null]
+  );
+  return rows[0];
+}
+
+async function getOrdenesDrop() {
+  const { rows } = await pool.query('SELECT * FROM ordenes_drop ORDER BY creado_en DESC');
+  return rows;
+}
+
+async function getOrdenesDropPendientes() {
+  const { rows } = await pool.query(
+    `SELECT * FROM ordenes_drop WHERE estado = 'lista_para_facturar' ORDER BY creado_en ASC`
+  );
+  return rows;
+}
+
+async function getOrdenDropById(id) {
+  const { rows } = await pool.query('SELECT * FROM ordenes_drop WHERE id = $1', [id]);
+  return rows[0] || null;
+}
+
+async function marcarOrdenFacturada(id) {
+  await pool.query(
+    `UPDATE ordenes_drop SET estado = 'facturada', facturada_en = now() WHERE id = $1`,
+    [id]
+  );
+}
+
 async function setItemStatus(itemId, status) {
   return mlFetch(`/items/${itemId}`, {
     method: 'PUT',
@@ -339,6 +386,12 @@ module.exports = {
   getConfig,
   setConfig,
   setCosto,
+  setTipo,
+  crearOrdenDrop,
+  getOrdenesDrop,
+  getOrdenesDropPendientes,
+  getOrdenDropById,
+  marcarOrdenFacturada,
   setItemStatus,
   setItemStock,
   getUnansweredQuestions,

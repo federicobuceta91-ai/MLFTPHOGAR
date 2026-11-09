@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Remito #<%= orden.id %> - SymL</title>
+  <link rel="icon" type="image/png" href="/favicon.png" />
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    .remito { max-width: 640px; margin: 40px auto; padding: 32px; border: 1px solid var(--borde); border-radius: 8px; background: white; }
+    .remito-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; gap: 16px; }
+    .remito-logo { width: 140px; height: auto; }
+    .remito table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    .remito th, .remito td { text-align: left; padding: 8px 4px; border-bottom: 1px solid var(--borde); font-size: 14px; vertical-align: top; }
+    .remito th { width: 160px; color: var(--gris); font-weight: 600; }
+    @media print {
+      .no-imprimir { display: none; }
+      .remito { border: none; margin: 0; padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="remito">
+    <div class="remito-header">
+      <img src="/img/logo.png" alt="SymL" class="remito-logo" />
+      <div style="text-align: right;">
+        <h1 style="font-size: 18px; margin: 0;">Remito simulado #<%= orden.id %></h1>
+        <p class="muted" style="margin: 4px 0 0;"><%= new Date(orden.creado_en).toLocaleString('es-AR') %></p>
+      </div>
+    </div>
+
+    <p class="muted">
+      Prototipo de Drop Shipping: este remito todavía no sale de un Odoo real, es para
+      probar el circuito completo antes de conectarlo con SPL Distribuidora.
+    </p>
+
+    <table>
+      <tbody>
+        <tr><th>Proveedor</th><td><%= orden.proveedor || '—' %></td></tr>
+        <tr><th>Producto</th><td><%= orden.titulo %></td></tr>
+        <tr><th>Cantidad</th><td><%= orden.cantidad %></td></tr>
+        <tr><th>Comprador</th><td><%= orden.comprador || '—' %></td></tr>
+        <tr><th>Dirección de envío</th><td><%= orden.direccion_envio || '—' %></td></tr>
+        <tr>
+          <th>Estado</th>
+          <td>
+            <span class="badge <%= orden.estado === 'facturada' ? 'badge-activo' : 'badge-drop' %>">
+              <%= orden.estado === 'facturada' ? 'Facturada' : 'Lista para facturar' %>
+            </span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <button onclick="window.print()" class="boton-grande no-imprimir" style="margin-top: 24px;">
+      Imprimir / Guardar como PDF
+    </button>
+  </div>
+</body>
+</html>

@@ -61,6 +61,7 @@ function linkOrden(campo, label) {
         <th>Impuestos</th>
         <th><%- linkOrden('margen', 'Margen neto') %></th>
         <th><%- linkOrden('stock', 'Stock') %></th>
+        <th>Tipo</th>
         <th>Acciones</th>
       </tr>
     </thead>
@@ -137,12 +138,25 @@ function linkOrden(campo, label) {
             </form>
           </td>
           <td>
+            <span class="badge <%= it.tipo === 'drop' ? 'badge-drop' : 'badge-activo' %>">
+              <%= it.tipo === 'drop' ? 'Drop' : 'Propio' %>
+            </span>
+            <form method="POST" action="/productos/<%= it.id %>/tipo" class="inline-form" style="margin-top: 4px;">
+              <select name="tipo" class="input-chico" style="width: auto;">
+                <option value="propio" <%= it.tipo !== 'drop' ? 'selected' : '' %>>Propio</option>
+                <option value="drop" <%= it.tipo === 'drop' ? 'selected' : '' %>>Drop</option>
+              </select>
+              <input type="text" name="proveedor" value="<%= it.proveedor || '' %>" placeholder="proveedor" class="input-chico" style="width: 90px;" />
+              <button type="submit" class="link-btn">Guardar</button>
+            </form>
+          </td>
+          <td>
             <a href="<%= it.permalink %>" target="_blank" rel="noopener" class="link-btn">Ver en ML</a>
           </td>
         </tr>
       <% }) %>
       <% if (items.length === 0) { %>
-        <tr><td colspan="10" class="muted">No hay publicaciones que coincidan con los filtros.</td></tr>
+        <tr><td colspan="11" class="muted">No hay publicaciones que coincidan con los filtros.</td></tr>
       <% } %>
     </tbody>
   </table>

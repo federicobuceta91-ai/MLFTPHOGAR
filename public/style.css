@@ -117,6 +117,7 @@ h1 { font-size: 22px; }
 .badge-activo { background: #e7f7ed; color: var(--verde); }
 .badge-pausado { background: #fdeceb; color: var(--rojo); }
 .badge-stock-bajo { background: #fff4e0; color: #b8650a; }
+.badge-drop { background: #eef2ff; color: var(--azul); }
 
 .filtros-form { margin-bottom: 14px; }
 .filtros-row { display: flex; align-items: center; gap: 16px; margin-top: 10px; flex-wrap: wrap; }

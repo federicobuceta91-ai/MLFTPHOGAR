@@ -25,7 +25,28 @@ async function migrate() {
       ml_item_id TEXT PRIMARY KEY,
       costo NUMERIC,
       notas TEXT,
+      tipo TEXT NOT NULL DEFAULT 'propio',
+      proveedor TEXT,
       updated_at TIMESTAMPTZ DEFAULT now()
+    );
+  `);
+
+  // Por si la tabla ya existía de antes de que agregáramos Drop Shipping.
+  await pool.query(`ALTER TABLE productos ADD COLUMN IF NOT EXISTS tipo TEXT NOT NULL DEFAULT 'propio';`);
+  await pool.query(`ALTER TABLE productos ADD COLUMN IF NOT EXISTS proveedor TEXT;`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ordenes_drop (
+      id SERIAL PRIMARY KEY,
+      ml_item_id TEXT NOT NULL,
+      titulo TEXT NOT NULL,
+      proveedor TEXT,
+      cantidad INTEGER NOT NULL DEFAULT 1,
+      comprador TEXT,
+      direccion_envio TEXT,
+      estado TEXT NOT NULL DEFAULT 'lista_para_facturar',
+      creado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
+      facturada_en TIMESTAMPTZ
     );
   `);
 

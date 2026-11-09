@@ -29,6 +29,18 @@ function requireLogin(req, res, next) {
   return res.redirect('/login');
 }
 
+// Login aparte para el "Panel SPL" (el futuro esclavo que usaría SPL Distribuidora).
+function requireSplLogin(req, res, next) {
+  if (req.session.splLoggedIn) return next();
+  return res.redirect('/spl/login');
+}
+
+// Para el remito: lo puede ver tanto Federico como alguien logueado en el Panel SPL.
+function requireAlgunLogin(req, res, next) {
+  if (req.session.loggedIn || req.session.splLoggedIn) return next();
+  return res.redirect('/login');
+}
+
 // ---------- Login de la app (compartido para Federico y su hija) ----------
 
 app.get('/login', (req, res) => {
@@ -46,6 +58,26 @@ app.post('/login', (req, res) => {
 
 app.post('/logout', (req, res) => {
   req.session.destroy(() => res.redirect('/login'));
+});
+
+// ---------- Login aparte del Panel SPL (prototipo del "esclavo" para SPL Distribuidora) ----------
+
+app.get('/spl/login', (req, res) => {
+  res.render('spl-login', { error: null });
+});
+
+app.post('/spl/login', (req, res) => {
+  const { usuario, clave } = req.body;
+  if (usuario === process.env.SPL_LOGIN_USER && clave === process.env.SPL_LOGIN_PASS) {
+    req.session.splLoggedIn = true;
+    return res.redirect('/spl');
+  }
+  res.render('spl-login', { error: 'Usuario o clave incorrectos' });
+});
+
+app.post('/spl/logout', (req, res) => {
+  req.session.splLoggedIn = false;
+  res.redirect('/spl/login');
 });
 
 // ---------- Conexión OAuth con MercadoLibre ----------
@@ -162,6 +194,62 @@ app.get('/publicaciones', requireLogin, requireMlConnected, async (req, res) => 
     console.error(err);
     res.status(500).send('Error consultando MercadoLibre: ' + err.message);
   }
+});
+
+// ---------- Drop Shipping (prototipo: todavía simulado, sin conexión real a Odoo/SPL) ----------
+
+app.post('/productos/:id/tipo', requireLogin, async (req, res) => {
+  const { tipo, proveedor } = req.body;
+  await ml.setTipo(req.params.id, tipo, proveedor);
+  res.redirect(req.get('Referer') || '/publicaciones');
+});
+
+app.get('/drop-shipping', requireLogin, requireMlConnected, async (req, res) => {
+  try {
+    const items = await ml.getItemsWithCostos(req.mlUserId);
+    const productosDrop = items.filter((it) => it.tipo === 'drop');
+    const ordenes = await ml.getOrdenesDrop();
+    res.render('drop-shipping', { productosDrop, ordenes });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Error consultando MercadoLibre: ' + err.message);
+  }
+});
+
+app.post('/drop-shipping/simular', requireLogin, async (req, res) => {
+  const { itemId, titulo, proveedor, cantidad, comprador, direccionEnvio } = req.body;
+  await ml.crearOrdenDrop({
+    itemId,
+    titulo,
+    proveedor,
+    cantidad: Number(cantidad) || 1,
+    comprador,
+    direccionEnvio,
+  });
+  res.redirect('/drop-shipping');
+});
+
+app.post('/drop-shipping/:id/facturar', requireLogin, async (req, res) => {
+  await ml.marcarOrdenFacturada(req.params.id);
+  res.redirect('/drop-shipping');
+});
+
+app.get('/drop-shipping/:id/remito', requireAlgunLogin, async (req, res) => {
+  const orden = await ml.getOrdenDropById(req.params.id);
+  if (!orden) return res.status(404).send('Orden no encontrada.');
+  res.render('remito', { orden });
+});
+
+// ---------- Panel SPL (vista de prueba de lo que vería SPL Distribuidora) ----------
+
+app.get('/spl', requireSplLogin, async (req, res) => {
+  const pendientes = await ml.getOrdenesDropPendientes();
+  res.render('spl-panel', { pendientes });
+});
+
+app.post('/spl/:id/facturar', requireSplLogin, async (req, res) => {
+  await ml.marcarOrdenFacturada(req.params.id);
+  res.redirect('/spl');
 });
 
 // ---------- Secciones todavía en construcción ----------

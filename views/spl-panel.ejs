@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Panel SPL - SymL</title>
+  <link rel="icon" type="image/png" href="/favicon.png" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body style="background: #1a1a2e; min-height: 100vh;">
+  <div class="container" style="max-width: 900px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+      <img src="/img/logo.png" alt="SymL" style="width: 160px; height: auto;" />
+      <form method="POST" action="/spl/logout">
+        <button type="submit" class="link-btn" style="color: #ccc;">Cerrar sesión</button>
+      </form>
+    </div>
+
+    <h1 style="color: #f0f0f0;">Panel SPL — Pedidos listos para facturar</h1>
+    <p class="muted" style="color: #999;">
+      Prototipo: acá verían, apenas se confirma una venta en MercadoLibre, el pedido
+      ya cargado y listo para facturar de su lado, con el remito para bajar e imprimir.
+    </p>
+
+    <% if (pendientes.length === 0) { %>
+      <div class="card">
+        <p class="muted">No hay pedidos pendientes por el momento.</p>
+      </div>
+    <% } else { %>
+      <table class="tabla">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Producto</th>
+            <th>Cant.</th>
+            <th>Comprador</th>
+            <th>Dirección de envío</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% pendientes.forEach(function(o) { %>
+            <tr>
+              <td class="muted"><%= new Date(o.creado_en).toLocaleString('es-AR') %></td>
+              <td><%= o.titulo %></td>
+              <td><%= o.cantidad %></td>
+              <td><%= o.comprador || '—' %></td>
+              <td><%= o.direccion_envio || '—' %></td>
+              <td>
+                <a href="/drop-shipping/<%= o.id %>/remito" target="_blank" rel="noopener" class="link-btn">Ver remito</a>
+                <form method="POST" action="/spl/<%= o.id %>/facturar" class="inline-form">
+                  <button type="submit" class="link-btn">Marcar facturada</button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+  </div>
+</body>
+</html>

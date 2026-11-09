@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Panel SPL - SymL</title>
+  <link rel="icon" type="image/png" href="/favicon.png" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body class="login-body">
+  <form method="POST" action="/spl/login" class="login-card">
+    <img src="/img/logo.png" alt="SymL" class="login-logo" />
+    <p class="login-sub">Panel SPL (prototipo)</p>
+    <% if (error) { %>
+      <p class="error"><%= error %></p>
+    <% } %>
+    <label>Usuario</label>
+    <input type="text" name="usuario" autocomplete="username" required />
+    <label>Clave</label>
+    <input type="password" name="clave" autocomplete="current-password" required />
+    <button type="submit">Ingresar</button>
+  </form>
+</body>
+</html>

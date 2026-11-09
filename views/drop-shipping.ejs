@@ -1,0 +1,103 @@
+<%- include('partials/head', { title: 'Drop Shipping - SymL', active: 'drop-shipping' }) %>
+
+  <h1>Drop Shipping</h1>
+  <p class="muted">
+    Esto todavía es un prototipo con datos simulados: nada de lo que pase acá se manda
+    a ningún sistema externo. La idea es probar toda la mecánica (marcar productos como
+    Drop, simular una venta, generar el remito, ver el "Panel SPL") y una vez que
+    funcione bien, conectarlo de verdad a Odoo de SPL Distribuidora sin tener que
+    rehacer nada de esto.
+  </p>
+
+  <h2 style="font-size: 16px; margin-top: 28px;">Productos marcados como Drop</h2>
+  <% if (productosDrop.length === 0) { %>
+    <p class="muted">
+      Todavía no marcaste ninguna publicación como "Drop". Andá a
+      <a href="/publicaciones">Publicaciones</a> y cambiá el tipo a "Drop" en la que
+      quieras probar.
+    </p>
+  <% } else { %>
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Proveedor</th>
+          <th>Stock en ML</th>
+          <th>Simular venta</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% productosDrop.forEach(function(it) { %>
+          <tr>
+            <td class="prod-cell">
+              <img src="<%= it.thumbnail %>" alt="" class="thumb" />
+              <%= it.titulo %>
+            </td>
+            <td><%= it.proveedor || '—' %></td>
+            <td><%= it.stock %></td>
+            <td>
+              <form method="POST" action="/drop-shipping/simular" class="filtros-row" style="gap: 8px; margin: 0;">
+                <input type="hidden" name="itemId" value="<%= it.id %>" />
+                <input type="hidden" name="titulo" value="<%= it.titulo %>" />
+                <input type="hidden" name="proveedor" value="<%= it.proveedor || '' %>" />
+                <input type="number" name="cantidad" value="1" min="1" class="input-chico" style="width: 60px;" title="Cantidad" />
+                <input type="text" name="comprador" placeholder="Comprador (simulado)" class="input-busqueda" style="min-width: 160px;" />
+                <input type="text" name="direccionEnvio" placeholder="Dirección de envío (simulada)" class="input-busqueda" style="min-width: 200px;" />
+                <button type="submit" class="link-btn">Simular venta</button>
+              </form>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <% } %>
+
+  <h2 style="font-size: 16px; margin-top: 28px;">Órdenes generadas</h2>
+  <% if (ordenes.length === 0) { %>
+    <p class="muted">Todavía no simulaste ninguna venta Drop.</p>
+  <% } else { %>
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Producto</th>
+          <th>Cant.</th>
+          <th>Proveedor</th>
+          <th>Comprador</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% ordenes.forEach(function(o) { %>
+          <tr>
+            <td class="muted"><%= new Date(o.creado_en).toLocaleString('es-AR') %></td>
+            <td><%= o.titulo %></td>
+            <td><%= o.cantidad %></td>
+            <td><%= o.proveedor || '—' %></td>
+            <td><%= o.comprador || '—' %></td>
+            <td>
+              <span class="badge <%= o.estado === 'facturada' ? 'badge-activo' : 'badge-drop' %>">
+                <%= o.estado === 'facturada' ? 'Facturada' : 'Lista para facturar' %>
+              </span>
+            </td>
+            <td>
+              <a href="/drop-shipping/<%= o.id %>/remito" target="_blank" rel="noopener" class="link-btn">Ver remito</a>
+              <% if (o.estado !== 'facturada') { %>
+                <form method="POST" action="/drop-shipping/<%= o.id %>/facturar" class="inline-form">
+                  <button type="submit" class="link-btn">Marcar facturada</button>
+                </form>
+              <% } %>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <% } %>
+
+  <p class="muted" style="margin-top: 24px;">
+    Panel de prueba de SPL (login aparte, para simular qué vería SPL Distribuidora):
+    <a href="/spl" target="_blank" rel="noopener">abrir Panel SPL →</a>
+  </p>
+
+<%- include('partials/foot') %>
