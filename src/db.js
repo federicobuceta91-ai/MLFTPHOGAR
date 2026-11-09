@@ -28,6 +28,21 @@ async function migrate() {
       updated_at TIMESTAMPTZ DEFAULT now()
     );
   `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS config (
+      id INTEGER PRIMARY KEY DEFAULT 1,
+      impuestos_pct NUMERIC DEFAULT 0,
+      updated_at TIMESTAMPTZ DEFAULT now(),
+      CONSTRAINT single_row_config CHECK (id = 1)
+    );
+  `);
+
+  await pool.query(`
+    INSERT INTO config (id, impuestos_pct)
+    VALUES (1, 0)
+    ON CONFLICT (id) DO NOTHING;
+  `);
 }
 
 module.exports = { pool, migrate };

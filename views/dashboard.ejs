@@ -11,6 +11,11 @@
 
   <main class="container">
     <h1>Publicaciones (<%= total %>)</h1>
+    <p class="muted">
+      Comisión y envío son estimados por MercadoLibre antes de la venta. Impuestos es el
+      % que cargaste en <a href="/configuracion">Configuración</a>. Conviene ir ajustando
+      estos valores con tus ventas reales cada tanto.
+    </p>
 
     <div class="tabs">
       <a href="/?estado=todas" class="<%= filtro === 'todas' ? 'active' : '' %>">Todas</a>
@@ -26,6 +31,8 @@
           <th>Precio</th>
           <th>Costo</th>
           <th>Comisión ML</th>
+          <th>Envío</th>
+          <th>Impuestos</th>
           <th>Margen neto</th>
           <th>Stock</th>
           <th>Acciones</th>
@@ -61,6 +68,24 @@
                 $<%= it.comisionML.toFixed(2) %>
               <% } else { %>
                 <span class="muted">sin datos</span>
+              <% } %>
+            </td>
+            <td>
+              <% if (!it.envioGratis) { %>
+                <span class="muted">a cargo del comprador</span>
+              <% } else if (it.envioCost != null) { %>
+                $<%= it.envioCost.toFixed(2) %>
+                <span class="muted">(gratis, estimado)</span>
+              <% } else { %>
+                <span class="muted">envío gratis, sin datos</span>
+              <% } %>
+            </td>
+            <td>
+              <% if (it.impuestosPct > 0) { %>
+                $<%= it.impuestoMonto.toFixed(2) %>
+                <span class="muted">(<%= it.impuestosPct %>%)</span>
+              <% } else { %>
+                <span class="muted">—</span>
               <% } %>
             </td>
             <td>

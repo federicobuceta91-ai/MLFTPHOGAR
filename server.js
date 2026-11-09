@@ -123,6 +123,19 @@ app.post('/productos/:id/stock', requireLogin, requireMlConnected, async (req, r
   res.redirect(req.get('Referer') || '/');
 });
 
+// ---------- Configuración (impuestos, etc.) ----------
+
+app.get('/configuracion', requireLogin, async (req, res) => {
+  const config = await ml.getConfig();
+  res.render('configuracion', { config, guardado: req.query.guardado === '1' });
+});
+
+app.post('/configuracion', requireLogin, async (req, res) => {
+  const pct = Number(req.body.impuestos_pct) || 0;
+  await ml.setConfig(pct);
+  res.redirect('/configuracion?guardado=1');
+});
+
 // ---------- Preguntas ----------
 
 app.get('/preguntas', requireLogin, requireMlConnected, async (req, res) => {

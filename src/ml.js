@@ -152,21 +152,60 @@ async function getComisionML(item) {
   }
 }
 
+async function getEnvioCost(item) {
+  try {
+    const envioGratis = !!(item.shipping && item.shipping.free_shipping);
+    if (!envioGratis) return 0; // el comprador paga el envío, no es costo del vendedor
+
+    const data = await mlFetch(`/items/${item.id}/shipping_options`);
+    const opciones = (data && data.options) || [];
+    const principal = opciones.find((o) => typeof o.list_cost === 'number') || opciones[0];
+    if (!principal || typeof principal.list_cost !== 'number') return null;
+    return principal.list_cost;
+  } catch (err) {
+    console.error('No se pudo obtener el costo de envío para', item.id, err.message);
+    return null;
+  }
+}
+
+async function getConfig() {
+  const { rows } = await pool.query('SELECT * FROM config WHERE id = 1');
+  return rows[0] || { impuestos_pct: 0 };
+}
+
+async function setConfig(impuestosPct) {
+  await pool.query(
+    `INSERT INTO config (id, impuestos_pct, updated_at) VALUES (1, $1, now())
+     ON CONFLICT (id) DO UPDATE SET impuestos_pct = EXCLUDED.impuestos_pct, updated_at = now()`,
+    [impuestosPct]
+  );
+}
+
 async function getItemsWithCostos(userId) {
   const ids = await getAllItemIds(userId);
   const items = await getItemsDetails(ids);
   const { rows } = await pool.query('SELECT * FROM productos');
   const costos = Object.fromEntries(rows.map((r) => [r.ml_item_id, r]));
+  const config = await getConfig();
+  const impuestosPct = Number(config.impuestos_pct) || 0;
 
-  const comisiones = await Promise.all(items.map((it) => getComisionML(it)));
+  const [comisiones, envios] = await Promise.all([
+    Promise.all(items.map((it) => getComisionML(it))),
+    Promise.all(items.map((it) => getEnvioCost(it))),
+  ]);
 
   return items.map((it, idx) => {
     const costoRow = costos[it.id];
     const costo = costoRow ? Number(costoRow.costo) : null;
     const precio = it.price;
     const comisionML = comisiones[idx];
+    const envioCost = envios[idx];
+    const impuestoMonto = (precio * impuestosPct) / 100;
     const margenBruto = costo != null ? precio - costo : null;
-    const margen = costo != null ? precio - costo - (comisionML || 0) : null;
+    const margen =
+      costo != null
+        ? precio - costo - (comisionML || 0) - (envioCost || 0) - impuestoMonto
+        : null;
     const margenPct = costo != null && costo > 0 ? ((margen / costo) * 100) : null;
     return {
       id: it.id,
@@ -178,6 +217,10 @@ async function getItemsWithCostos(userId) {
       thumbnail: it.thumbnail,
       costo,
       comisionML,
+      envioCost,
+      envioGratis: !!(it.shipping && it.shipping.free_shipping),
+      impuestosPct,
+      impuestoMonto,
       margenBruto,
       margen,
       margenPct,
@@ -240,6 +283,8 @@ module.exports = {
   exchangeCodeForToken,
   getStoredTokens,
   getItemsWithCostos,
+  getConfig,
+  setConfig,
   setCosto,
   setItemStatus,
   setItemStock,
