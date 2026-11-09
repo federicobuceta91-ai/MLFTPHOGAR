@@ -146,9 +146,20 @@ async function getComisionML(item) {
     const match =
       opciones.find((o) => o.listing_type_id === item.listing_type_id) || opciones[0];
     if (!match) return null;
+    // `sale_fee_amount` es el monto total que informa ML para esta venta. Según
+    // la documentación de la API (no se pudo confirmar en vivo porque este
+    // entorno no tiene salida de red hacia api.mercadolibre.com), este monto ya
+    // vendría con el costo fijo por unidad vendida (el que aplica a productos
+    // de menos de $33.000, ver Calculadora) sumado junto con el % de comisión
+    // — no por separado. Si ML alguna vez lo manda separado en
+    // `sale_fee_details` (percentage_fee + fixed_fee), lo sumamos acá para no
+    // perder ese costo fijo.
     if (typeof match.sale_fee_amount === 'number') return match.sale_fee_amount;
     if (match.sale_fee_details && typeof match.sale_fee_details.percentage_fee === 'number') {
-      return (item.price * match.sale_fee_details.percentage_fee) / 100;
+      const comisionPorcentual = (item.price * match.sale_fee_details.percentage_fee) / 100;
+      const costoFijo =
+        typeof match.sale_fee_details.fixed_fee === 'number' ? match.sale_fee_details.fixed_fee : 0;
+      return comisionPorcentual + costoFijo;
     }
     return null;
   } catch (err) {
