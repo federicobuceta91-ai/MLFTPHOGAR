@@ -192,10 +192,59 @@ app.get('/publicaciones', requireLogin, requireMlConnected, async (req, res) => 
       stockBajoUmbral: STOCK_BAJO_UMBRAL,
       total: items.length,
       errorAccion: req.query.errorAccion || null,
+      creada: req.query.creada || null,
     });
   } catch (err) {
     console.error(err);
     res.status(500).send('Error consultando MercadoLibre: ' + err.message);
+  }
+});
+
+// ---------- Nueva publicación (duplicando una existente como plantilla) ----------
+
+app.get('/nueva-publicacion', requireLogin, requireMlConnected, async (req, res) => {
+  try {
+    const items = await ml.getItemsWithCostos(req.mlUserId);
+    const q = (req.query.q || '').trim().toLowerCase();
+    const filtrados = q ? items.filter((it) => it.titulo.toLowerCase().includes(q)) : items;
+    res.render('nueva-publicacion', { items: filtrados, q: req.query.q || '' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Error consultando MercadoLibre: ' + err.message);
+  }
+});
+
+app.get('/nueva-publicacion/:id', requireLogin, requireMlConnected, async (req, res) => {
+  try {
+    const template = await ml.getItemFull(req.params.id);
+    const descripcion = await ml.getItemDescription(req.params.id);
+    res.render('nueva-publicacion-form', { template, descripcion, error: null, valores: null });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Error consultando MercadoLibre: ' + err.message);
+  }
+});
+
+app.post('/nueva-publicacion/:id', requireLogin, requireMlConnected, async (req, res) => {
+  const { titulo, precio, stock, fotos, descripcion, costo, tipo, proveedor } = req.body;
+  try {
+    const nuevo = await ml.crearPublicacionDesdeTemplate(req.params.id, {
+      titulo, precio, stock, fotos, descripcion, costo, tipo, proveedor,
+    });
+    res.redirect(`/publicaciones?creada=${nuevo.id}`);
+  } catch (err) {
+    console.error(err);
+    try {
+      const template = await ml.getItemFull(req.params.id);
+      res.render('nueva-publicacion-form', {
+        template,
+        descripcion,
+        error: err.message,
+        valores: { titulo, precio, stock, fotos, descripcion, costo, tipo, proveedor },
+      });
+    } catch (e2) {
+      res.status(500).send('Error creando la publicación: ' + err.message);
+    }
   }
 });
 

@@ -49,6 +49,10 @@ function precioEstadoInfo(status) {
 <%- include('partials/head', { title: 'Publicaciones - SymL', active: 'publicaciones' }) %>
 
   <h1>Publicaciones (<%= total %>)</h1>
+  <p><a href="/nueva-publicacion" class="link-btn">+ Nueva publicación</a></p>
+  <% if (typeof creada !== 'undefined' && creada) { %>
+    <p class="muted" style="color: var(--verde); font-weight: 700;">✔ Publicación creada en MercadoLibre (ID <%= creada %>). Puede tardar unos segundos en aparecer en la lista de abajo.</p>
+  <% } %>
   <% if (typeof errorAccion !== 'undefined' && errorAccion) { %>
     <p class="error"><%= errorAccion %></p>
   <% } %>

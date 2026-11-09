@@ -303,6 +303,7 @@ async function getItemsWithCostos(userId) {
       tipo: costoRow ? costoRow.tipo : 'propio',
       proveedor: costoRow ? costoRow.proveedor : null,
       precioAGanar,
+      tieneVariantes: Array.isArray(it.variations) && it.variations.length > 0,
     };
   });
 }
@@ -491,6 +492,115 @@ async function getReputation(userId) {
   };
 }
 
+// ---------- Nueva publicación (duplicando una existente como "plantilla") ----------
+// A diferencia de price_to_win o post-purchase/claims, POST /items es un
+// endpoint central y estable de la API de ML (no experimental), pero tampoco
+// se pudo probar en vivo durante el desarrollo (sin salida de red a
+// api.mercadolibre.com). Lo armamos reusando la categoría, condición,
+// atributos, forma de envío y tipo de publicación de una publicación
+// existente, para no tener que resolver nosotros el árbol de categorías ni
+// los atributos obligatorios de cada rubro.
+
+async function getItemFull(itemId) {
+  return mlFetch(`/items/${itemId}`);
+}
+
+async function getItemDescription(itemId) {
+  try {
+    const data = await mlFetch(`/items/${itemId}/description`);
+    return (data && data.plain_text) || '';
+  } catch (err) {
+    return '';
+  }
+}
+
+// ML devuelve los errores de validación (atributos faltantes, etc.) en
+// "cause". Si están, los mostramos en vez del mensaje genérico.
+function formatMlError(err) {
+  const causas = err.data && Array.isArray(err.data.cause) ? err.data.cause : [];
+  if (causas.length > 0) {
+    return causas.map((c) => c.message || c.code).join(' / ');
+  }
+  return err.message;
+}
+
+async function crearPublicacionDesdeTemplate(templateId, datos) {
+  // datos: { titulo, precio, stock, fotos, descripcion, costo, tipo, proveedor }
+  const template = await getItemFull(templateId);
+
+  if (Array.isArray(template.variations) && template.variations.length > 0) {
+    throw new Error(
+      'Esa publicación tiene variantes (talles/colores): por ahora no se pueden duplicar como plantilla, hay que cargarla a mano en MercadoLibre.'
+    );
+  }
+
+  const urls = (datos.fotos || '')
+    .split('\n')
+    .map((u) => u.trim())
+    .filter(Boolean);
+  const pictures = urls.length > 0
+    ? urls.map((source) => ({ source }))
+    : (template.pictures || []).map((p) => ({ id: p.id }));
+
+  const payload = {
+    title: datos.titulo,
+    category_id: template.category_id,
+    price: Number(datos.precio),
+    currency_id: template.currency_id,
+    available_quantity: Number(datos.stock),
+    buying_mode: template.buying_mode,
+    listing_type_id: template.listing_type_id,
+    condition: template.condition,
+    pictures,
+    attributes: template.attributes || [],
+  };
+  if (template.sale_terms && template.sale_terms.length > 0) {
+    payload.sale_terms = template.sale_terms;
+  }
+  if (template.shipping) {
+    payload.shipping = {
+      mode: template.shipping.mode,
+      local_pick_up: !!template.shipping.local_pick_up,
+      free_shipping: !!template.shipping.free_shipping,
+    };
+  }
+
+  let nuevo;
+  try {
+    nuevo = await mlFetch('/items', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    err.message = formatMlError(err);
+    throw err;
+  }
+
+  if (datos.descripcion) {
+    try {
+      await mlFetch(`/items/${nuevo.id}/description`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plain_text: datos.descripcion }),
+      });
+    } catch (err) {
+      // La publicación ya se creó en ML; si solo falla la descripción no
+      // tiene sentido perderla, lo dejamos registrado para revisar a mano.
+      console.error('La publicación se creó pero no se pudo guardar la descripción:', err.message);
+    }
+  }
+
+  if (datos.costo !== undefined && datos.costo !== '') {
+    await setCosto(nuevo.id, Number(datos.costo), null);
+  }
+  if (datos.tipo) {
+    await setTipo(nuevo.id, datos.tipo, datos.proveedor);
+  }
+
+  return nuevo;
+}
+
 module.exports = {
   authorizeUrl,
   exchangeCodeForToken,
@@ -515,4 +625,7 @@ module.exports = {
   answerQuestion,
   getReputation,
   getReclamos,
+  getItemFull,
+  getItemDescription,
+  crearPublicacionDesdeTemplate,
 };

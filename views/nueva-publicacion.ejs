@@ -1,0 +1,51 @@
+<%- include('partials/head', { title: 'Nueva publicación - SymL', active: 'nueva-publicacion' }) %>
+
+  <h1>Nueva publicación</h1>
+  <p class="muted">
+    Por ahora, la forma de crear una publicación nueva es duplicar una que ya tengas
+    como "plantilla": elegís una publicación parecida (misma categoría/rubro) y
+    después solo cambiás lo que es distinto — título, precio, stock, fotos y
+    descripción. Así nos ahorramos tener que pedirte a mano todos los datos
+    obligatorios que exige MercadoLibre según el rubro del producto (marca,
+    modelo, etc.), porque los reusamos de la plantilla.
+  </p>
+
+  <form method="GET" action="/nueva-publicacion" class="filtros-row">
+    <input type="text" name="q" placeholder="Buscar por nombre..." value="<%= q %>" class="input-busqueda" />
+    <button type="submit">Buscar</button>
+  </form>
+
+  <table class="tabla" style="margin-top: 16px;">
+    <thead>
+      <tr>
+        <th>Producto</th>
+        <th>Precio</th>
+        <th>Stock</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (items.length === 0) { %>
+        <tr><td colspan="4" class="muted">No se encontraron publicaciones.</td></tr>
+      <% } %>
+      <% items.forEach(function(it) { %>
+        <tr>
+          <td class="prod-cell">
+            <img src="<%= it.thumbnail %>" alt="" class="thumb" />
+            <%= it.titulo %>
+          </td>
+          <td>$<%= it.precio %></td>
+          <td><%= it.stock %></td>
+          <td>
+            <% if (it.tieneVariantes) { %>
+              <span class="muted" title="Tiene talles/colores: por ahora no se puede duplicar como plantilla">No disponible (tiene variantes)</span>
+            <% } else { %>
+              <a href="/nueva-publicacion/<%= it.id %>" class="link-btn">Usar como plantilla</a>
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+
+<%- include('partials/foot') %>
