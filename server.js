@@ -190,6 +190,7 @@ app.get('/publicaciones', requireLogin, requireMlConnected, async (req, res) => 
       dir,
       stockBajoUmbral: STOCK_BAJO_UMBRAL,
       total: items.length,
+      errorAccion: req.query.errorAccion || null,
     });
   } catch (err) {
     console.error(err);
@@ -275,22 +276,40 @@ app.post('/productos/:id/costo', requireLogin, async (req, res) => {
   res.redirect(req.get('Referer') || '/');
 });
 
+// Si MercadoLibre rechaza el cambio (por ejemplo, no te deja reactivar una
+// publicación sin stock o con algún problema de calidad), antes esto fallaba
+// en silencio: redirigía como si nada y el usuario nunca se enteraba. Ahora
+// agregamos el motivo como parámetro en la URL para poder mostrarlo.
+function redirectConError(req, res, mensaje) {
+  const referer = req.get('Referer') || '/publicaciones';
+  let url;
+  try {
+    url = new URL(referer, `${req.protocol}://${req.get('host')}`);
+  } catch (e) {
+    return res.redirect('/publicaciones');
+  }
+  url.searchParams.set('errorAccion', mensaje);
+  res.redirect(url.pathname + url.search);
+}
+
 app.post('/productos/:id/estado', requireLogin, requireMlConnected, async (req, res) => {
   try {
     await ml.setItemStatus(req.params.id, req.body.estado);
+    res.redirect(req.get('Referer') || '/');
   } catch (err) {
     console.error(err);
+    redirectConError(req, res, 'MercadoLibre no permitió cambiar el estado: ' + err.message);
   }
-  res.redirect(req.get('Referer') || '/');
 });
 
 app.post('/productos/:id/stock', requireLogin, requireMlConnected, async (req, res) => {
   try {
     await ml.setItemStock(req.params.id, Number(req.body.stock));
+    res.redirect(req.get('Referer') || '/');
   } catch (err) {
     console.error(err);
+    redirectConError(req, res, 'MercadoLibre no permitió actualizar el stock: ' + err.message);
   }
-  res.redirect(req.get('Referer') || '/');
 });
 
 // ---------- Configuración (impuestos, etc.) ----------

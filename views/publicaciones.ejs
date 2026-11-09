@@ -12,6 +12,9 @@ function linkOrden(campo, label) {
 <%- include('partials/head', { title: 'Publicaciones - SymL', active: 'publicaciones' }) %>
 
   <h1>Publicaciones (<%= total %>)</h1>
+  <% if (typeof errorAccion !== 'undefined' && errorAccion) { %>
+    <p class="error"><%= errorAccion %></p>
+  <% } %>
   <p class="muted">
     Comisión y envío son estimados por MercadoLibre antes de la venta. Impuestos es el
     % que cargaste en <a href="/configuracion">Configuración</a>. Conviene ir ajustando
