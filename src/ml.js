@@ -2,6 +2,10 @@ const crypto = require('crypto');
 const { pool } = require('./db');
 
 const API = 'https://api.mercadolibre.com';
+
+// A partir de este número de unidades (inclusive) se considera "stock bajo".
+// Usado tanto en el filtro de Publicaciones como en las sugerencias del Agente.
+const STOCK_BAJO_UMBRAL = 3;
 const AUTH_BASE = 'https://auth.mercadolibre.com.ar';
 
 function authorizeUrl(state) {
@@ -305,6 +309,7 @@ async function getItemsWithCostos(userId) {
       precioAGanar,
       tieneVariantes: Array.isArray(it.variations) && it.variations.length > 0,
       categoryId: it.category_id || null,
+      fotos: Array.isArray(it.pictures) ? it.pictures.length : null,
     };
   });
 }
@@ -427,6 +432,14 @@ async function setItemStock(itemId, quantity) {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ available_quantity: quantity }),
+  });
+}
+
+async function setItemPrice(itemId, price) {
+  return mlFetch(`/items/${itemId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ price }),
   });
 }
 
@@ -806,6 +819,138 @@ async function getPrecioPromedioCategoria(categoryId, siteId) {
   }
 }
 
+// ---------- Agente de mejoras ----------
+// Motor de REGLAS FIJAS (no IA): revisa el estado actual de la cuenta cada vez
+// que se entra a /agente (no corre solo en segundo plano, al menos en esta
+// versión) y arma una lista de sugerencias. Nunca aplica nada solo: cada
+// sugerencia "accionable" necesita que Federico apriete un botón para
+// ejecutar el cambio real en MercadoLibre, igual que el resto de la app.
+
+const AGENTE_OBJETIVO_MARGEN_PCT = 15; // margen mínimo deseado sobre el costo, ajustable más adelante
+const AGENTE_FOTOS_MINIMAS = 3;
+
+async function getDescartes() {
+  const { rows } = await pool.query('SELECT ml_item_id, tipo FROM agente_descartes');
+  return new Set(rows.map((r) => `${r.ml_item_id}|${r.tipo}`));
+}
+
+async function getDescartesDetalle() {
+  const { rows } = await pool.query('SELECT * FROM agente_descartes ORDER BY creado_en DESC');
+  return rows;
+}
+
+async function descartarPropuesta(itemId, tipo) {
+  await pool.query(
+    `INSERT INTO agente_descartes (ml_item_id, tipo) VALUES ($1, $2)
+     ON CONFLICT (ml_item_id, tipo) DO NOTHING`,
+    [itemId, tipo]
+  );
+}
+
+async function reactivarDescarte(id) {
+  await pool.query('DELETE FROM agente_descartes WHERE id = $1', [id]);
+}
+
+async function getPropuestas(userId) {
+  const items = await getItemsWithCostos(userId);
+  const descartadas = await getDescartes();
+  const activos = items.filter((it) => it.estado === 'active');
+  const propuestas = [];
+
+  for (const it of activos) {
+    const descartada = (tipo) => descartadas.has(`${it.id}|${tipo}`);
+
+    // 1. Margen bajo o negativo: solo si tenemos costo cargado. Calcula el
+    // precio mínimo para llegar a un margen objetivo sobre el costo.
+    if (it.costo != null && !descartada('margen_bajo')) {
+      const comision = it.comisionML || 0;
+      const envio = it.envioCost || 0;
+      const impuestosFrac = (it.impuestosPct || 0) / 100;
+      const divisor = 1 - impuestosFrac;
+      if (divisor > 0) {
+        const objetivo = it.costo * (AGENTE_OBJETIVO_MARGEN_PCT / 100);
+        const precioSugerido = Math.ceil((objetivo + it.costo + comision + envio) / divisor);
+        if (precioSugerido > it.precio + 1) {
+          const vendeConPerdida = it.margen != null && it.margen < 0;
+          propuestas.push({
+            tipo: 'margen_bajo',
+            prioridad: vendeConPerdida ? 'alta' : 'media',
+            itemId: it.id,
+            titulo: it.titulo,
+            thumbnail: it.thumbnail,
+            permalink: it.permalink,
+            descripcion: vendeConPerdida
+              ? `Vende con pérdida (margen $${it.margen.toFixed(2)}).`
+              : `Margen bajo (${it.margenPct != null ? it.margenPct.toFixed(0) : '?'}% sobre el costo, objetivo ${AGENTE_OBJETIVO_MARGEN_PCT}%).`,
+            valorActual: it.precio,
+            valorSugerido: precioSugerido,
+            accionable: true,
+          });
+        }
+      }
+    }
+
+    // 2. Pocas fotos.
+    if (it.fotos != null && it.fotos < AGENTE_FOTOS_MINIMAS && !descartada('pocas_fotos')) {
+      propuestas.push({
+        tipo: 'pocas_fotos',
+        prioridad: 'media',
+        itemId: it.id,
+        titulo: it.titulo,
+        thumbnail: it.thumbnail,
+        permalink: it.permalink,
+        descripcion: `Tiene ${it.fotos} foto(s) cargada(s). MercadoLibre recomienda al menos ${AGENTE_FOTOS_MINIMAS}.`,
+        valorActual: it.fotos,
+        valorSugerido: null,
+        accionable: false,
+      });
+    }
+
+    // 3. Precio vs. Buy Box (experimental: ver advertencia en price_to_win).
+    if (
+      it.precioAGanar &&
+      it.precioAGanar.status &&
+      it.precioAGanar.status !== 'winning' &&
+      it.precioAGanar.precioParaGanar != null &&
+      it.precioAGanar.precioParaGanar < it.precio &&
+      !descartada('precio_buybox')
+    ) {
+      propuestas.push({
+        tipo: 'precio_buybox',
+        prioridad: 'media',
+        itemId: it.id,
+        titulo: it.titulo,
+        thumbnail: it.thumbnail,
+        permalink: it.permalink,
+        descripcion: `No tiene la mejor oferta (experimental). Bajando el precio la ganarías.`,
+        valorActual: it.precio,
+        valorSugerido: it.precioAGanar.precioParaGanar,
+        accionable: true,
+      });
+    }
+
+    // 4. Stock bajo.
+    if (it.stock <= STOCK_BAJO_UMBRAL && !descartada('stock_bajo')) {
+      propuestas.push({
+        tipo: 'stock_bajo',
+        prioridad: it.stock === 0 ? 'alta' : 'media',
+        itemId: it.id,
+        titulo: it.titulo,
+        thumbnail: it.thumbnail,
+        permalink: it.permalink,
+        descripcion: `Quedan ${it.stock} unidad(es).`,
+        valorActual: it.stock,
+        valorSugerido: null,
+        accionable: false,
+      });
+    }
+  }
+
+  const ordenPrioridad = { alta: 0, media: 1, baja: 2 };
+  propuestas.sort((a, b) => (ordenPrioridad[a.prioridad] ?? 1) - (ordenPrioridad[b.prioridad] ?? 1));
+  return propuestas;
+}
+
 module.exports = {
   authorizeUrl,
   exchangeCodeForToken,
@@ -826,6 +971,8 @@ module.exports = {
   marcarOrdenFacturada,
   setItemStatus,
   setItemStock,
+  setItemPrice,
+  STOCK_BAJO_UMBRAL,
   getUnansweredQuestions,
   answerQuestion,
   getReputation,
@@ -839,4 +986,8 @@ module.exports = {
   getVentasPorSemana,
   getVisitasYConversion,
   getPrecioPromedioCategoria,
+  getPropuestas,
+  descartarPropuesta,
+  getDescartesDetalle,
+  reactivarDescarte,
 };

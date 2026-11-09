@@ -70,6 +70,20 @@ async function migrate() {
     VALUES (1, 0)
     ON CONFLICT (id) DO NOTHING;
   `);
+
+  // Agente de mejoras: solo guarda qué sugerencias se descartaron, para que no
+  // vuelvan a aparecer. Las sugerencias en sí NUNCA se guardan — se recalculan
+  // al momento cada vez que se entra a /agente, en base al estado actual real
+  // de MercadoLibre.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS agente_descartes (
+      id SERIAL PRIMARY KEY,
+      ml_item_id TEXT NOT NULL,
+      tipo TEXT NOT NULL,
+      creado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (ml_item_id, tipo)
+    );
+  `);
 }
 
 module.exports = { pool, migrate };

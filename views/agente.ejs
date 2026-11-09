@@ -1,0 +1,124 @@
+<%
+const TIPOS = {
+  margen_bajo: { label: 'Margen', clase: 'badge-stock-bajo' },
+  pocas_fotos: { label: 'Fotos', clase: 'badge-drop' },
+  precio_buybox: { label: 'Precio vs. competencia', clase: 'badge-drop' },
+  stock_bajo: { label: 'Stock', clase: 'badge-pausado' },
+};
+function tipoInfo(tipo) {
+  return TIPOS[tipo] || { label: tipo, clase: 'badge-pausado' };
+}
+const PRIORIDADES = {
+  alta: { label: 'Alta', clase: 'badge-pausado' },
+  media: { label: 'Media', clase: 'badge-stock-bajo' },
+  baja: { label: 'Baja', clase: 'badge-activo' },
+};
+function prioridadInfo(p) {
+  return PRIORIDADES[p] || { label: p, clase: 'badge-pausado' };
+}
+const altaPrioridad = propuestas.filter((p) => p.prioridad === 'alta').length;
+%>
+<%- include('partials/head', { title: 'Agente - SymL', active: 'agente' }) %>
+
+  <h1>Agente de mejoras</h1>
+  <p class="muted">
+    Esto NO es una inteligencia artificial tomando decisiones solo: es un motor de reglas
+    fijas que revisa tus publicaciones activas cada vez que entrás acá (margen, fotos,
+    mejor oferta y stock) y te arma esta lista. <strong>Nunca se aplica nada sin que vos
+    apretes el botón</strong> — "Aplicar" ejecuta el cambio real en MercadoLibre en el momento,
+    "Descartar" lo saca de esta lista (podés reactivarlo después, al final de la página).
+  </p>
+
+  <% if (aplicado) { %>
+    <p class="muted" style="color: var(--verde); font-weight: 700;">✔ Precio actualizado en MercadoLibre.</p>
+  <% } %>
+  <% if (errorAccion) { %>
+    <p class="error"><%= errorAccion %></p>
+  <% } %>
+
+  <p>
+    <strong><%= propuestas.length %></strong> sugerencia(s)
+    <% if (altaPrioridad > 0) { %>
+      — <span class="badge badge-pausado"><%= altaPrioridad %> de prioridad alta</span>
+    <% } %>
+  </p>
+
+  <% if (propuestas.length === 0) { %>
+    <p class="muted">No hay sugerencias por ahora. 🎉</p>
+  <% } else { %>
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Tipo</th>
+          <th>Prioridad</th>
+          <th>Detalle</th>
+          <th>Acción</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% propuestas.forEach(function(p) { %>
+          <tr>
+            <td class="prod-cell">
+              <img src="<%= p.thumbnail %>" alt="" class="thumb" />
+              <a href="<%= p.permalink %>" target="_blank" rel="noopener"><%= p.titulo %></a>
+            </td>
+            <td><span class="badge <%= tipoInfo(p.tipo).clase %>"><%= tipoInfo(p.tipo).label %></span></td>
+            <td><span class="badge <%= prioridadInfo(p.prioridad).clase %>"><%= prioridadInfo(p.prioridad).label %></span></td>
+            <td><%= p.descripcion %></td>
+            <td>
+              <% if (p.tipo === 'margen_bajo' || p.tipo === 'precio_buybox') { %>
+                <form method="POST" action="/agente/<%= p.itemId %>/aplicar-precio" class="inline-form">
+                  <input type="hidden" name="precio" value="<%= p.valorSugerido %>" />
+                  <button type="submit" class="link-btn">Aplicar precio: $<%= p.valorSugerido %></button>
+                </form>
+              <% } else if (p.tipo === 'stock_bajo') { %>
+                <form method="POST" action="/productos/<%= p.itemId %>/stock" class="inline-form">
+                  <input type="number" name="stock" value="<%= p.valorActual %>" class="input-chico" />
+                  <button type="submit" class="link-btn">Guardar stock</button>
+                </form>
+              <% } else { %>
+                <a href="<%= p.permalink %>" target="_blank" rel="noopener" class="link-btn">Ver en ML</a>
+              <% } %>
+              <form method="POST" action="/agente/<%= p.itemId %>/descartar" class="inline-form" style="margin-top: 4px;">
+                <input type="hidden" name="tipo" value="<%= p.tipo %>" />
+                <button type="submit" class="link-btn muted">Descartar</button>
+              </form>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <% } %>
+
+  <h2 style="font-size: 16px; margin-top: 32px;">Descartadas (<%= descartes.length %>)</h2>
+  <% if (descartes.length === 0) { %>
+    <p class="muted">No descartaste ninguna sugerencia.</p>
+  <% } else { %>
+    <table class="tabla">
+      <thead>
+        <tr>
+          <th>Producto</th>
+          <th>Tipo</th>
+          <th>Descartada</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% descartes.forEach(function(d) { %>
+          <tr>
+            <td class="muted"><%= d.ml_item_id %></td>
+            <td><span class="badge <%= tipoInfo(d.tipo).clase %>"><%= tipoInfo(d.tipo).label %></span></td>
+            <td class="muted"><%= new Date(d.creado_en).toLocaleString('es-AR') %></td>
+            <td>
+              <form method="POST" action="/agente/descartes/<%= d.id %>/reactivar" class="inline-form">
+                <button type="submit" class="link-btn">Reactivar</button>
+              </form>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  <% } %>
+
+<%- include('partials/foot') %>

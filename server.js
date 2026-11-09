@@ -144,7 +144,7 @@ app.get('/', requireLogin, requireMlConnected, async (req, res) => {
 
 // ---------- Publicaciones: rentabilidad y stock ----------
 
-const STOCK_BAJO_UMBRAL = 3; // a partir de este número (inclusive) se considera "stock bajo"
+const STOCK_BAJO_UMBRAL = ml.STOCK_BAJO_UMBRAL;
 
 app.get('/publicaciones', requireLogin, requireMlConnected, async (req, res) => {
   try {
@@ -501,6 +501,46 @@ app.get('/comparativa', requireLogin, requireMlConnected, async (req, res) => {
     console.error(err);
     res.status(500).send('Error consultando comparativa: ' + err.message);
   }
+});
+
+// ---------- Agente de mejoras ----------
+// Motor de reglas fijas (no IA). Nunca aplica nada solo: cada acción real
+// sobre MercadoLibre necesita que el usuario apriete un botón.
+
+app.get('/agente', requireLogin, requireMlConnected, async (req, res) => {
+  try {
+    const propuestas = await ml.getPropuestas(req.mlUserId);
+    const descartes = await ml.getDescartesDetalle();
+    res.render('agente', {
+      propuestas,
+      descartes,
+      aplicado: req.query.aplicado || null,
+      errorAccion: req.query.errorAccion || null,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Error consultando el agente: ' + err.message);
+  }
+});
+
+app.post('/agente/:id/aplicar-precio', requireLogin, requireMlConnected, async (req, res) => {
+  try {
+    await ml.setItemPrice(req.params.id, Number(req.body.precio));
+    res.redirect('/agente?aplicado=1');
+  } catch (err) {
+    console.error(err);
+    redirectConError(req, res, 'MercadoLibre no permitió cambiar el precio: ' + err.message);
+  }
+});
+
+app.post('/agente/:id/descartar', requireLogin, async (req, res) => {
+  await ml.descartarPropuesta(req.params.id, req.body.tipo);
+  res.redirect('/agente');
+});
+
+app.post('/agente/descartes/:id/reactivar', requireLogin, async (req, res) => {
+  await ml.reactivarDescarte(req.params.id);
+  res.redirect('/agente');
 });
 
 // ---------- Arranque ----------
