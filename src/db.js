@@ -98,6 +98,33 @@ async function migrate() {
       creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
+
+  // Suscripciones a notificaciones push del navegador/app instalada (una fila
+  // por dispositivo/navegador que activó los avisos, no por usuario — un
+  // mismo usuario puede tener varios dispositivos suscriptos).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id SERIAL PRIMARY KEY,
+      usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+      endpoint TEXT UNIQUE NOT NULL,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      creado_en TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+
+  // Qué eventos de MercadoLibre (venta o pregunta) ya generaron un aviso push,
+  // para no avisar dos veces lo mismo si el webhook de ML reintenta el envío
+  // o si una misma orden cambia de estado varias veces.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ml_eventos_notificados (
+      id SERIAL PRIMARY KEY,
+      tipo TEXT NOT NULL,
+      recurso_id TEXT NOT NULL,
+      creado_en TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (tipo, recurso_id)
+    );
+  `);
 }
 
 module.exports = { pool, migrate };

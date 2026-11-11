@@ -25,6 +25,150 @@
     porque pueden variar según el método de pago del comprador y otras condiciones.
   </p>
 
+  <div class="card" style="max-width: 560px; margin-top: 24px;">
+    <h2 style="font-size: 16px; margin-top: 0;">Notificaciones</h2>
+    <p class="muted">
+      Un aviso en este dispositivo (celular o PC, con la app instalada) apenas entra
+      una venta nueva o una pregunta nueva de un comprador — no hace falta tener la
+      app abierta para recibirlo.
+    </p>
+
+    <% if (!pushHabilitado) { %>
+      <p class="error">
+        Esta función todavía no está activada del lado del servidor — faltan cargar
+        <code>VAPID_PUBLIC_KEY</code> y <code>VAPID_PRIVATE_KEY</code> en las
+        Environment Variables de Render.
+      </p>
+    <% } else { %>
+      <p id="pushEstado" class="muted">Revisando el estado en este dispositivo…</p>
+      <p id="pushNoSoportado" class="error" style="display: none;">
+        Este navegador no soporta notificaciones push. En iPhone/iPad hace falta
+        instalar la app primero ("Compartir" → "Agregar a pantalla de inicio") y
+        abrirla desde ahí.
+      </p>
+      <button id="pushActivarBtn" type="button" style="display: none;">Activar notificaciones en este dispositivo</button>
+      <button id="pushDesactivarBtn" type="button" class="link-btn" style="display: none;">Desactivar en este dispositivo</button>
+      <p class="muted" style="margin-top: 10px;">
+        <%= suscripcionesPush %> dispositivo<%= suscripcionesPush === 1 ? '' : 's' %> tuyo<%= suscripcionesPush === 1 ? '' : 's' %>
+        con los avisos activados ahora mismo.
+      </p>
+    <% } %>
+
+    <details style="margin-top: 14px;">
+      <summary style="cursor: pointer; font-weight: 600; font-size: 13px;">
+        Paso único en MercadoLibre para que lleguen los avisos
+      </summary>
+      <p class="muted" style="margin-top: 8px;">
+        Para que la venta o la pregunta disparen el aviso, MercadoLibre tiene que saber a
+        qué URL avisarnos. Se configura una sola vez: entrá a
+        <a href="https://developers.mercadolibre.com.ar/" target="_blank" rel="noopener">developers.mercadolibre.com.ar</a>
+        → tu aplicación ("ML FTP HTPGAR") → "Notificaciones", cargá como URL de
+        notificaciones <code>https://mlftphogar.onrender.com/ml/notificaciones</code>
+        y marcá los topics <code>orders_v2</code> y <code>questions</code>.
+      </p>
+    </details>
+  </div>
+
+  <script>
+  (function () {
+    var pushHabilitado = <%- JSON.stringify(!!pushHabilitado) %>;
+    if (!pushHabilitado) return;
+    var VAPID_PUBLIC_KEY = <%- JSON.stringify(vapidPublicKey || '') %>;
+
+    function urlBase64ToUint8Array(base64String) {
+      var padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+      var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+      var rawData = window.atob(base64);
+      var outputArray = new Uint8Array(rawData.length);
+      for (var i = 0; i < rawData.length; i++) outputArray[i] = rawData.charCodeAt(i);
+      return outputArray;
+    }
+
+    var estadoEl = document.getElementById('pushEstado');
+    var noSoportadoEl = document.getElementById('pushNoSoportado');
+    var activarBtn = document.getElementById('pushActivarBtn');
+    var desactivarBtn = document.getElementById('pushDesactivarBtn');
+
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+      estadoEl.style.display = 'none';
+      noSoportadoEl.style.display = '';
+      return;
+    }
+
+    function mostrarActivado() {
+      estadoEl.textContent = 'Activadas en este dispositivo ✔';
+      activarBtn.style.display = 'none';
+      desactivarBtn.style.display = '';
+    }
+    function mostrarDesactivado() {
+      estadoEl.textContent = 'Todavía no activaste los avisos en este dispositivo.';
+      activarBtn.style.display = '';
+      desactivarBtn.style.display = 'none';
+    }
+
+    navigator.serviceWorker.ready
+      .then(function (reg) { return reg.pushManager.getSubscription(); })
+      .then(function (sub) {
+        if (sub) mostrarActivado();
+        else mostrarDesactivado();
+      })
+      .catch(function () {
+        estadoEl.textContent = 'No se pudo revisar el estado de las notificaciones acá.';
+      });
+
+    activarBtn.addEventListener('click', function () {
+      activarBtn.disabled = true;
+      Notification.requestPermission()
+        .then(function (permiso) {
+          if (permiso !== 'granted') {
+            estadoEl.textContent = 'El navegador no dio permiso para mostrar notificaciones.';
+            activarBtn.disabled = false;
+            return null;
+          }
+          return navigator.serviceWorker.ready.then(function (reg) {
+            return reg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+            });
+          });
+        })
+        .then(function (sub) {
+          if (!sub) return;
+          return fetch('/push/suscribirse', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(sub),
+          }).then(function () { mostrarActivado(); });
+        })
+        .catch(function (err) {
+          estadoEl.textContent = 'No se pudo activar: ' + err.message;
+        })
+        .finally(function () { activarBtn.disabled = false; });
+    });
+
+    desactivarBtn.addEventListener('click', function () {
+      desactivarBtn.disabled = true;
+      navigator.serviceWorker.ready
+        .then(function (reg) { return reg.pushManager.getSubscription(); })
+        .then(function (sub) {
+          if (!sub) return mostrarDesactivado();
+          var endpoint = sub.endpoint;
+          return sub.unsubscribe().then(function () {
+            return fetch('/push/desuscribirse', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ endpoint: endpoint }),
+            });
+          }).then(function () { mostrarDesactivado(); });
+        })
+        .catch(function (err) {
+          estadoEl.textContent = 'No se pudo desactivar: ' + err.message;
+        })
+        .finally(function () { desactivarBtn.disabled = false; });
+    });
+  })();
+  </script>
+
   <div class="card" style="max-width: 420px; margin-top: 24px;">
     <% if (splGuardado) { %>
       <p class="muted" style="color: var(--verde); font-weight: 700;">Guardado ✔</p>

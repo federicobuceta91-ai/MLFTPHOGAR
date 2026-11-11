@@ -150,6 +150,10 @@ function precioEstadoInfo(status) {
           </td>
           <td>
             $<%= it.precio %>
+            <form method="POST" action="/productos/<%= it.id %>/precio" class="inline-form" style="margin-top: 6px;">
+              <input type="number" step="0.01" min="0" name="precio" value="<%= it.precio %>" class="input-chico" style="width: 85px;" />
+              <button type="submit" class="link-btn">Cambiar precio</button>
+            </form>
             <% if (it.costo != null) { %>
               <form
                 method="POST"
@@ -249,7 +253,10 @@ function precioEstadoInfo(status) {
             </form>
           </td>
           <td>
-            <a href="<%= it.permalink %>" target="_blank" rel="noopener" class="link-btn">Ver en ML</a>
+            <a href="/publicaciones/<%= it.id %>" class="link-btn">Ver detalle</a>
+            <div style="margin-top: 4px;">
+              <a href="<%= it.permalink %>" target="_blank" rel="noopener" class="link-btn">Ver en ML</a>
+            </div>
           </td>
         </tr>
       <% }) %>

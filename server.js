@@ -6,6 +6,7 @@ const path = require('path');
 
 const { migrate } = require('./src/db');
 const ml = require('./src/ml');
+const push = require('./src/push');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -116,6 +117,21 @@ app.get('/callback', requireLogin, async (req, res) => {
   }
 });
 
+// ---------- Webhook de notificaciones de MercadoLibre (venta nueva, pregunta nueva) ----------
+// A esta URL llama MercadoLibre solo, nunca un navegador — por eso no lleva
+// requireLogin. Hay que configurarla como "URL de notificaciones" en la app
+// de developers.mercadolibre.com.ar (ver Configuración → Notificaciones en la
+// app para el paso a paso). ML espera una respuesta rápida, así que
+// respondemos 200 de entrada y procesamos el evento después, sin bloquear la
+// respuesta — si el procesamiento falla, queda solo en el log del server,
+// nunca le llega un error a ML.
+app.post('/ml/notificaciones', express.json(), (req, res) => {
+  res.sendStatus(200);
+  ml.procesarNotificacionML(req.body).catch((err) => {
+    console.error('Error procesando notificación de MercadoLibre:', err);
+  });
+});
+
 // ---------- Helper: exige que ya esté conectada la cuenta de ML ----------
 
 async function requireMlConnected(req, res, next) {
@@ -205,6 +221,22 @@ app.get('/publicaciones', requireLogin, requireMlConnected, async (req, res) => 
       total: items.length,
       errorAccion: req.query.errorAccion || null,
       creada: req.query.creada || null,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Error consultando MercadoLibre: ' + err.message);
+  }
+});
+
+// ---------- Detalle / análisis de una publicación puntual ----------
+
+app.get('/publicaciones/:id', requireLogin, requireMlConnected, async (req, res) => {
+  try {
+    const detalle = await ml.getPublicacionDetalle(req.mlUserId, req.params.id);
+    res.render('publicacion-detalle', {
+      ...detalle,
+      stockBajoUmbral: STOCK_BAJO_UMBRAL,
+      errorAccion: req.query.errorAccion || null,
     });
   } catch (err) {
     console.error(err);
@@ -396,6 +428,7 @@ app.get('/configuracion', requireLogin, async (req, res) => {
   const config = await ml.getConfig();
   const spl = await ml.getSplCredenciales();
   const usuarios = await ml.getUsuarios();
+  const suscripcionesPush = await push.contarSuscripcionesDeUsuario(req.session.usuarioId);
   res.render('configuracion', {
     config,
     spl,
@@ -406,6 +439,9 @@ app.get('/configuracion', requireLogin, async (req, res) => {
     splError: req.query.splError || null,
     usuarioCreado: req.query.usuarioCreado === '1',
     usuarioError: req.query.usuarioError || null,
+    vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null,
+    pushHabilitado: push.habilitado(),
+    suscripcionesPush,
   });
 });
 
@@ -486,6 +522,33 @@ app.post('/configuracion/usuarios/:id/activo', requireLogin, async (req, res) =>
   }
   await ml.setUsuarioActivo(req.params.id, activo);
   res.redirect('/configuracion');
+});
+
+// ---------- Notificaciones push (navegador/app instalada) ----------
+// Lo que manda el navegador al activar/desactivar los avisos en este
+// dispositivo (ver el script en views/configuracion.ejs). No son formularios
+// normales: el navegador llama a esto con fetch() y JSON, por eso necesitan
+// su propio express.json() en vez del express.urlencoded() global.
+
+app.post('/push/suscribirse', requireLogin, express.json(), async (req, res) => {
+  try {
+    await push.guardarSuscripcion(req.session.usuarioId, req.body);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/push/desuscribirse', requireLogin, express.json(), async (req, res) => {
+  try {
+    const { endpoint } = req.body || {};
+    if (endpoint) await push.eliminarSuscripcion(endpoint);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error(err);
+    res.status(400).json({ ok: false, error: err.message });
+  }
 });
 
 // ---------- Preguntas ----------

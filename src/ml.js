@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { pool } = require('./db');
+const push = require('./push');
 
 const API = 'https://api.mercadolibre.com';
 
@@ -336,6 +337,48 @@ async function verificarLogin(email, clave) {
   return { id: usuario.id, email: usuario.email, nombre: usuario.nombre };
 }
 
+// Arma el objeto "ítem con costos" que usan tanto la tabla de Publicaciones
+// como la pantalla de detalle de una publicación puntual — para no duplicar
+// la cuenta de margen en dos lugares.
+function construirItemConCostos(it, costoRow, impuestosPct, comisionML, envioCost, precioAGanar) {
+  const costo = costoRow ? Number(costoRow.costo) : null;
+  const precio = it.price;
+  const impuestoMonto = (precio * impuestosPct) / 100;
+  const margenBruto = costo != null ? precio - costo : null;
+  const margen =
+    costo != null
+      ? precio - costo - (comisionML || 0) - (envioCost || 0) - impuestoMonto
+      : null;
+  const margenPct = costo != null && costo > 0 ? ((margen / costo) * 100) : null;
+  return {
+    id: it.id,
+    titulo: it.title,
+    precio,
+    stock: it.available_quantity,
+    estado: it.status,
+    subEstado: Array.isArray(it.sub_status) ? it.sub_status : [],
+    permalink: it.permalink,
+    thumbnail: it.thumbnail,
+    costo,
+    comisionML,
+    envioCost,
+    envioGratis: !!(it.shipping && it.shipping.free_shipping),
+    impuestosPct,
+    impuestoMonto,
+    margenBruto,
+    margen,
+    margenPct,
+    health: typeof it.health === 'number' ? it.health : null,
+    notas: costoRow ? costoRow.notas : null,
+    tipo: costoRow ? costoRow.tipo : 'propio',
+    proveedor: costoRow ? costoRow.proveedor : null,
+    precioAGanar,
+    tieneVariantes: Array.isArray(it.variations) && it.variations.length > 0,
+    categoryId: it.category_id || null,
+    fotos: Array.isArray(it.pictures) ? it.pictures.length : null,
+  };
+}
+
 async function getItemsWithCostos(userId) {
   const ids = await getAllItemIds(userId);
   const items = await getItemsDetails(ids);
@@ -350,48 +393,25 @@ async function getItemsWithCostos(userId) {
     Promise.all(items.map((it) => getPrecioAGanar(it))),
   ]);
 
-  return items.map((it, idx) => {
-    const costoRow = costos[it.id];
-    const costo = costoRow ? Number(costoRow.costo) : null;
-    const precio = it.price;
-    const comisionML = comisiones[idx];
-    const envioCost = envios[idx];
-    const precioAGanar = preciosAGanar[idx];
-    const impuestoMonto = (precio * impuestosPct) / 100;
-    const margenBruto = costo != null ? precio - costo : null;
-    const margen =
-      costo != null
-        ? precio - costo - (comisionML || 0) - (envioCost || 0) - impuestoMonto
-        : null;
-    const margenPct = costo != null && costo > 0 ? ((margen / costo) * 100) : null;
-    return {
-      id: it.id,
-      titulo: it.title,
-      precio,
-      stock: it.available_quantity,
-      estado: it.status,
-      subEstado: Array.isArray(it.sub_status) ? it.sub_status : [],
-      permalink: it.permalink,
-      thumbnail: it.thumbnail,
-      costo,
-      comisionML,
-      envioCost,
-      envioGratis: !!(it.shipping && it.shipping.free_shipping),
-      impuestosPct,
-      impuestoMonto,
-      margenBruto,
-      margen,
-      margenPct,
-      health: typeof it.health === 'number' ? it.health : null,
-      notas: costoRow ? costoRow.notas : null,
-      tipo: costoRow ? costoRow.tipo : 'propio',
-      proveedor: costoRow ? costoRow.proveedor : null,
-      precioAGanar,
-      tieneVariantes: Array.isArray(it.variations) && it.variations.length > 0,
-      categoryId: it.category_id || null,
-      fotos: Array.isArray(it.pictures) ? it.pictures.length : null,
-    };
-  });
+  return items.map((it, idx) =>
+    construirItemConCostos(it, costos[it.id], impuestosPct, comisiones[idx], envios[idx], preciosAGanar[idx])
+  );
+}
+
+// Lo mismo que getItemsWithCostos pero para UN solo ítem puntual (pantalla de
+// detalle de una publicación) — no hace falta traer y procesar todas las
+// publicaciones de la cuenta para mostrar el análisis de una sola.
+async function getItemConCostos(itemId) {
+  const it = await mlFetch(`/items/${itemId}`);
+  const { rows } = await pool.query('SELECT * FROM productos WHERE ml_item_id = $1', [itemId]);
+  const config = await getConfig();
+  const impuestosPct = Number(config.impuestos_pct) || 0;
+  const [comisionML, envioCost, precioAGanar] = await Promise.all([
+    getComisionML(it),
+    getEnvioCost(it),
+    getPrecioAGanar(it),
+  ]);
+  return construirItemConCostos(it, rows[0], impuestosPct, comisionML, envioCost, precioAGanar);
 }
 
 async function getVentasYCMV(userId, dias = 30) {
@@ -526,6 +546,70 @@ async function setItemPrice(itemId, price) {
 async function getUnansweredQuestions(userId) {
   const data = await mlFetch(`/questions/search?seller_id=${userId}&status=UNANSWERED&sort_fields=date_created&sort_types=DESC`);
   return data.questions || [];
+}
+
+// ---------- Notificaciones push: aviso de venta nueva y pregunta nueva ----------
+// MercadoLibre llama a nuestro webhook (POST /ml/notificaciones, en server.js)
+// cada vez que pasa algo en la cuenta conectada. Acá solo nos interesan dos
+// "topics": `orders_v2` (una orden se creó o cambió de estado) y `questions`
+// (una pregunta se creó o se respondió). Por cada evento real que ya
+// avisamos, lo guardamos en `ml_eventos_notificados` para no mandar el mismo
+// aviso dos veces si ML reintenta el webhook, o si una misma orden pasa por
+// varios estados antes de quedar pagada.
+async function yaNotificado(tipo, recursoId) {
+  const { rows } = await pool.query(
+    `INSERT INTO ml_eventos_notificados (tipo, recurso_id) VALUES ($1, $2)
+     ON CONFLICT (tipo, recurso_id) DO NOTHING
+     RETURNING id`,
+    [tipo, recursoId]
+  );
+  return rows.length === 0; // true si ya existía (no se insertó una fila nueva)
+}
+
+async function procesarNotificacionVenta(resource) {
+  const orden = await mlFetch(resource);
+  if (orden.status !== 'paid') return; // todavía no es una venta confirmada
+  if (await yaNotificado('venta', String(orden.id))) return;
+
+  const items = (orden.order_items || [])
+    .map((oi) => `${oi.quantity || 1}x ${(oi.item && oi.item.title) || 'producto'}`)
+    .join(', ');
+  const monto = orden.total_amount != null ? `$${Number(orden.total_amount).toLocaleString('es-AR')}` : '';
+
+  await push.enviarATodos({
+    title: '🛒 ¡Venta nueva!',
+    body: [items, monto].filter(Boolean).join(' · ') || 'Revisá Publicaciones para los detalles.',
+    url: '/publicaciones',
+  });
+}
+
+async function procesarNotificacionPregunta(resource) {
+  const pregunta = await mlFetch(resource);
+  if (await yaNotificado('pregunta', String(pregunta.id))) return;
+
+  const texto = pregunta.text || 'Pregunta nueva de un comprador.';
+  await push.enviarATodos({
+    title: '💬 Pregunta nueva',
+    body: texto.length > 120 ? texto.slice(0, 117) + '...' : texto,
+    url: '/preguntas',
+  });
+}
+
+// Punto de entrada único llamado desde el webhook de server.js. No tira error
+// hacia afuera: cualquier problema queda en el log, nunca hace que ML vea un
+// error (ya respondimos 200 antes de llamar a esto).
+async function procesarNotificacionML(body) {
+  const { resource, topic, user_id } = body || {};
+  if (!resource || !topic) return;
+
+  const tokens = await getStoredTokens();
+  if (!tokens || String(user_id) !== String(tokens.ml_user_id)) return; // no es nuestra cuenta conectada
+
+  if (topic === 'orders_v2' || topic === 'orders') {
+    await procesarNotificacionVenta(resource);
+  } else if (topic === 'questions') {
+    await procesarNotificacionPregunta(resource);
+  }
 }
 
 async function answerQuestion(questionId, text) {
@@ -854,6 +938,50 @@ async function getVentasPorSemana(userId, semanas = 8) {
   return buckets;
 }
 
+// Lo mismo que getVentasPorSemana, pero filtrado a UN solo ítem — para la
+// pantalla de detalle de una publicación puntual (historial de ventas de ese
+// producto, no de toda la cuenta).
+async function getVentasPorSemanaItem(userId, itemId, semanas = 8) {
+  const hasta = new Date();
+  const desde = new Date(hasta.getTime() - semanas * 7 * 24 * 60 * 60 * 1000);
+  const msPorSemana = 7 * 24 * 60 * 60 * 1000;
+  const buckets = [];
+  for (let i = 0; i < semanas; i++) {
+    buckets.push({ inicio: new Date(desde.getTime() + i * msPorSemana), cantidad: 0, monto: 0 });
+  }
+
+  let offset = 0;
+  const limit = 50;
+  while (true) {
+    const params = new URLSearchParams({
+      seller: userId,
+      'order.status': 'paid',
+      'order.date_created.from': desde.toISOString(),
+      'order.date_created.to': hasta.toISOString(),
+      limit: String(limit),
+      offset: String(offset),
+    });
+    const data = await mlFetch(`/orders/search?${params.toString()}`);
+    const results = data.results || [];
+    for (const order of results) {
+      const fecha = new Date(order.date_created);
+      let idx = Math.floor((fecha - desde) / msPorSemana);
+      if (idx < 0) idx = 0;
+      if (idx >= semanas) idx = semanas - 1;
+      for (const oi of order.order_items || []) {
+        if (oi.item && oi.item.id === itemId) {
+          buckets[idx].cantidad += oi.quantity || 1;
+          buckets[idx].monto += (oi.unit_price || 0) * (oi.quantity || 1);
+        }
+      }
+    }
+    const total = data.paging ? data.paging.total : results.length;
+    offset += limit;
+    if (results.length === 0 || offset >= total) break;
+  }
+  return buckets;
+}
+
 // Visitas por publicación. EXPERIMENTAL: a diferencia de /shipments o
 // /orders/search (muy probados), este endpoint lo conocemos con menos
 // seguridad y no se pudo confirmar en vivo durante el desarrollo. Si falla,
@@ -880,6 +1008,32 @@ async function getVisitasYConversion(userId, dias = 30) {
     })
   );
   return resultados.sort((a, b) => (b.visitas || 0) - (a.visitas || 0));
+}
+
+// ---------- Detalle / análisis de una publicación puntual ----------
+// Junta todo lo que ya calculamos por separado para otras pantallas (costos y
+// margen, visitas y conversión, ventas por semana, competencia/Buy Box, precio
+// de la categoría) pero referido a UN solo ítem, para la pantalla "Ver
+// detalle" de Publicaciones.
+async function getPublicacionDetalle(userId, itemId) {
+  const [item, visitas, ventasMap, ventasPorSemana] = await Promise.all([
+    getItemConCostos(itemId),
+    getVisitasItem(itemId, 30),
+    ventasPorProductoMap(userId, 30),
+    getVentasPorSemanaItem(userId, itemId, 8),
+  ]);
+
+  const ventas30 = ventasMap[itemId] || { cantidad: 0, monto: 0 };
+  const conversion = visitas != null && visitas > 0 ? (ventas30.cantidad / visitas) * 100 : null;
+
+  let precioCategoria = null;
+  if (item.categoryId) {
+    const siteMatch = itemId.match(/^[A-Z]+/);
+    const siteId = siteMatch ? siteMatch[0] : 'MLA';
+    precioCategoria = await getPrecioPromedioCategoria(item.categoryId, siteId);
+  }
+
+  return { item, visitas, ventas30, conversion, ventasPorSemana, precioCategoria };
 }
 
 // ---------- Comparativa con la competencia ----------
@@ -1036,6 +1190,7 @@ module.exports = {
   exchangeCodeForToken,
   getStoredTokens,
   getItemsWithCostos,
+  getPublicacionDetalle,
   getVentasYCMV,
   getConfig,
   setConfig,
@@ -1077,4 +1232,5 @@ module.exports = {
   setUsuarioActivo,
   contarUsuariosActivos,
   verificarLogin,
+  procesarNotificacionML,
 };
