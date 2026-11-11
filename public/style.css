@@ -220,6 +220,13 @@ h1 { font-size: 22px; }
   gap: 14px;
   margin-bottom: 20px;
 }
+/* Los items de un grid tienen min-width:auto por defecto, igual que pasaba
+   con .content en un flex: si adentro hay una tabla (o cualquier contenido
+   ancho) la tarjeta no se achica para acompañar la columna y termina
+   "sangrando" por encima de la tarjeta de al lado en vez de ajustarse.
+   Con min-width:0 la tarjeta sí respeta el ancho de su columna y el
+   contenido ancho de adentro puede usar .tabla-wrap para scrollear. */
+.cards-grid > .card { min-width: 0; }
 
 .stat-label { font-size: 13px; color: var(--gris); margin-bottom: 6px; }
 .stat-value { font-size: 24px; font-weight: 700; }

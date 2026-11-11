@@ -30,9 +30,9 @@ const maxVentaSemana = Math.max(1, ...ventasPorSemana.map((b) => b.cantidad));
   <% } %>
 
   <div class="card" style="display: flex; gap: 16px; align-items: flex-start;">
-    <img src="<%= item.thumbnail %>" alt="" class="thumb" style="width: 70px; height: 70px;" />
-    <div>
-      <h1 style="margin: 0 0 6px 0; font-size: 18px;">
+    <img src="<%= item.thumbnail %>" alt="" class="thumb" style="width: 70px; height: 70px; flex-shrink: 0;" />
+    <div style="min-width: 0;">
+      <h1 style="margin: 0 0 6px 0; font-size: 18px; overflow-wrap: break-word;">
         <%= item.titulo %>
         <% if (item.health != null && item.health < 0.6) { %>
           <span title="MercadoLibre sugiere mejorar esta publicación">⚠</span>
@@ -98,7 +98,8 @@ const maxVentaSemana = Math.max(1, ...ventasPorSemana.map((b) => b.cantidad));
         <button type="submit" class="link-btn">Guardar costo</button>
       </form>
 
-      <table class="tabla" style="margin-top: 12px;">
+      <div class="tabla-wrap" style="margin-top: 12px;">
+      <table class="tabla">
         <tbody>
           <tr>
             <td>Precio de venta</td>
@@ -143,6 +144,7 @@ const maxVentaSemana = Math.max(1, ...ventasPorSemana.map((b) => b.cantidad));
           </tr>
         </tbody>
       </table>
+      </div>
     </div>
 
     <div class="card">
@@ -150,6 +152,7 @@ const maxVentaSemana = Math.max(1, ...ventasPorSemana.map((b) => b.cantidad));
         Visitas y conversión (últimos 30 días)
         <span class="badge badge-stock-bajo">Experimental</span>
       </h2>
+      <div class="tabla-wrap">
       <table class="tabla">
         <tbody>
           <tr><td>Visitas</td><td><%= visitas != null ? visitas : '—' %></td></tr>
@@ -158,6 +161,7 @@ const maxVentaSemana = Math.max(1, ...ventasPorSemana.map((b) => b.cantidad));
           <tr><td>Conversión</td><td><%= conversion != null ? conversion.toFixed(1) + '%' : '—' %></td></tr>
         </tbody>
       </table>
+      </div>
       <p class="muted" style="margin-top: 8px;">
         No pudimos confirmar en vivo el endpoint de visitas de MercadoLibre durante el
         desarrollo — si ves "—" en vez de un número, puede ser que el endpoint no sea
